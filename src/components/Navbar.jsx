@@ -79,10 +79,10 @@ export default function Navbar({ currentRoute, onNavigate }) {
             </span>
           </div>
           <div>
-            <span className="block text-base sm:text-xl font-bold font-mythic tracking-wide bg-gradient-to-r from-amber-100 via-gold-300 to-saffron-400 bg-clip-text text-transparent">
+            <span className="block text-base sm:text-xl font-bold font-mythic tracking-wide bg-gradient-to-r from-amber-100 via-gold-300 to-saffron-400 bg-clip-text text-transparent leading-tight">
               ModhakVerse
             </span>
-            <span className="block text-[10px] uppercase tracking-wider text-amber-400/80 font-cinzel font-semibold">
+            <span className="hidden sm:block text-[10px] uppercase tracking-wider text-amber-400/80 font-cinzel font-semibold">
               The Epic Journey of Ganpati
             </span>
           </div>

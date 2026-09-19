@@ -54,6 +54,21 @@
   .glow-text-saffron {
     text-shadow: 0 0 14px rgba(255, 119, 34, 0.7), 0 0 28px rgba(211, 47, 47, 0.5);
   }
+
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+  }
+
+  .safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0.75rem));
+  }
+
+  .touch-game-btn {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 /* Custom Scrollbar (WebKit / Chromium / Safari) */

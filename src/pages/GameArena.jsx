@@ -417,12 +417,19 @@ export default function GameArena({ onNavigate }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [switchLane, triggerJump, triggerSlide, togglePause]);
 
-  // Touch Swipe Gesture Handlers (Mobile)
+  // Touch Swipe Gesture Handlers (Mobile & Tablet)
   const handleTouchStart = (e) => {
     touchStartPos.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY
     };
+  };
+
+  const handleTouchMove = (e) => {
+    // Prevent mobile browser page bounce / pull-to-refresh while swiping
+    if (e.cancelable) {
+      e.preventDefault();
+    }
   };
 
   const handleTouchEnd = (e) => {
@@ -431,11 +438,11 @@ export default function GameArena({ onNavigate }) {
     const deltaY = e.changedTouches[0].clientY - touchStartPos.current.y;
 
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      if (deltaX > 35) switchLane('right');
-      else if (deltaX < -35) switchLane('left');
+      if (deltaX > 30) switchLane('right');
+      else if (deltaX < -30) switchLane('left');
     } else {
-      if (deltaY < -35) triggerJump();
-      else if (deltaY > 35) triggerSlide();
+      if (deltaY < -30) triggerJump();
+      else if (deltaY > 30) triggerSlide();
     }
     touchStartPos.current = null;
   };
@@ -734,8 +741,9 @@ export default function GameArena({ onNavigate }) {
 
   return (
     <div
-      className="relative w-full h-[calc(100vh-4.5rem)] overflow-hidden bg-cosmic-950 select-none"
+      className="relative w-full h-[calc(100vh-4.5rem)] overflow-hidden bg-cosmic-950 select-none touch-none"
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* 3D Celestial Runner Viewport */}
@@ -752,84 +760,85 @@ export default function GameArena({ onNavigate }) {
         ghosts={peers}
       />
 
-      {/* Top Floating Runner HUD */}
-      <div className="absolute top-3 inset-x-3 sm:inset-x-6 flex items-center justify-between pointer-events-none z-20">
-        {/* Left HUD: Distance & Level */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+      {/* Top Floating Runner HUD - Fully responsive across mobile, tablet, and desktop */}
+      <div className="absolute top-2 sm:top-3 inset-x-2 sm:inset-x-6 flex items-center justify-between pointer-events-none z-20 gap-1 sm:gap-2 safe-top">
+        {/* Left HUD: Distance, Level & Modaks */}
+        <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto">
           {/* Distance Counter */}
-          <div className="temple-glass rounded-2xl px-3.5 py-1.5 border border-gold-500/30 flex items-center gap-2 shadow-lg">
-            <Gauge className="w-4 h-4 text-marigold" />
-            <span className="font-mono text-sm sm:text-base font-bold text-amber-100">
+          <div className="temple-glass rounded-xl sm:rounded-2xl px-2.5 sm:px-3.5 py-1 sm:py-1.5 border border-gold-500/30 flex items-center gap-1.5 shadow-lg">
+            <Gauge className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-marigold shrink-0" />
+            <span className="font-mono text-xs sm:text-base font-bold text-amber-100">
               {distanceTraveled.toFixed(0)}m
             </span>
           </div>
 
           {/* Current Level Badge */}
-          <div className="temple-glass rounded-2xl px-3 py-1.5 border border-saffron-500/30 bg-saffron-950/40 flex items-center gap-1.5 shadow-lg">
-            <span className="text-xs font-bold text-amber-300 font-cinzel">
-              Level {currentLevel}
+          <div className="temple-glass rounded-xl sm:rounded-2xl px-2 sm:px-3 py-1 sm:py-1.5 border border-saffron-500/30 bg-saffron-950/40 flex items-center gap-1 shadow-lg">
+            <span className="text-[11px] sm:text-xs font-bold text-amber-300 font-cinzel">
+              L{currentLevel}
             </span>
           </div>
 
           {/* Modak Count */}
-          <div className="temple-glass rounded-2xl px-3 py-1.5 border border-gold-500/30 flex items-center gap-1.5 shadow-lg">
-            <span className="text-base">🥮</span>
+          <div className="temple-glass rounded-xl sm:rounded-2xl px-2 sm:px-3 py-1 sm:py-1.5 border border-gold-500/30 flex items-center gap-1 shadow-lg">
+            <span className="text-sm sm:text-base">🥮</span>
             <span className="text-xs sm:text-sm font-bold text-amber-200 font-mono">
               {modaksCollected}
             </span>
           </div>
 
-          {/* Guest Trial Badge */}
+          {/* Guest Trial Badge (Responsive: compact on mobile, full on tablet/desktop) */}
           {!localAuth.isAuthenticated() && (
-            <div className="temple-glass rounded-2xl px-3 py-1.5 border border-marigold/50 bg-amber-950/70 flex items-center gap-1.5 shadow-lg animate-pulse">
+            <div className="temple-glass rounded-xl sm:rounded-2xl px-2 sm:px-3 py-1 sm:py-1.5 border border-marigold/50 bg-amber-950/70 flex items-center gap-1 shadow-lg animate-pulse">
               <span className="text-xs">⚡</span>
-              <span className="text-xs font-bold text-amber-200 font-cinzel">
-                Free Trial Dash (1/1)
+              <span className="text-[10px] sm:text-xs font-bold text-amber-200 font-cinzel">
+                <span className="hidden sm:inline">Free Trial (1/1)</span>
+                <span className="sm:hidden">1/1</span>
               </span>
             </div>
           )}
         </div>
 
         {/* Center HUD: Dynamic Score & Combo */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="temple-glass rounded-2xl px-4 py-1.5 border border-gold-divine/40 bg-saffron-950/50 flex items-center gap-2 shadow-xl">
-            <Sparkles className="w-4 h-4 text-marigold animate-pulse" />
-            <span className="text-xs uppercase font-cinzel text-amber-300 tracking-wider hidden sm:inline">
+        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
+          <div className="temple-glass rounded-xl sm:rounded-2xl px-2.5 sm:px-4 py-1 sm:py-1.5 border border-gold-divine/40 bg-saffron-950/50 flex items-center gap-1.5 sm:gap-2 shadow-xl">
+            <Sparkles className="w-3.5 h-3.5 text-marigold animate-pulse shrink-0" />
+            <span className="text-xs uppercase font-cinzel text-amber-300 tracking-wider hidden md:inline">
               Score:
             </span>
-            <span className="text-base sm:text-lg font-bold text-amber-100 font-mythic glow-text-gold">
+            <span className="text-sm sm:text-lg font-bold text-amber-100 font-mythic glow-text-gold">
               {score}
             </span>
           </div>
 
           {combo >= 2 && (
-            <div className="temple-glass rounded-2xl px-2.5 py-1.5 border border-saffron-500/50 bg-saffron-900/40 text-amber-200 text-xs font-bold font-cinzel flex items-center gap-1 animate-pulse shadow-md">
-              <Flame className="w-3.5 h-3.5 text-marigold fill-current" />
-              <span>Streak x{combo}</span>
+            <div className="temple-glass rounded-xl sm:rounded-2xl px-2 sm:px-2.5 py-1 sm:py-1.5 border border-saffron-500/50 bg-saffron-900/40 text-amber-200 text-[10px] sm:text-xs font-bold font-cinzel flex items-center gap-1 animate-pulse shadow-md">
+              <Flame className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-marigold fill-current shrink-0" />
+              <span>x{combo}</span>
             </div>
           )}
 
           {multiplier > 1 && (
-            <div className="temple-glass rounded-2xl px-2.5 py-1.5 border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 text-xs font-bold font-cinzel flex items-center gap-1 shadow-md">
-              <Zap className="w-3.5 h-3.5 fill-emerald-400" />
-              <span>{multiplier}x Multiplier</span>
+            <div className="temple-glass rounded-xl sm:rounded-2xl px-2 sm:px-2.5 py-1 sm:py-1.5 border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 text-[10px] sm:text-xs font-bold font-cinzel flex items-center gap-1 shadow-md">
+              <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-emerald-400 shrink-0" />
+              <span>{multiplier}x</span>
             </div>
           )}
         </div>
 
         {/* Right HUD: Pause & Multiplayer Status */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="temple-glass rounded-2xl px-2.5 py-1.5 border border-gold-500/30 flex items-center gap-1.5 text-xs text-amber-200 shadow-md">
-            <Users className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden md:inline font-cinzel">Ghost Racers:</span>
-            <span className="font-bold text-cyan-300">{peers.length + 1}</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
+          <div className="temple-glass rounded-xl sm:rounded-2xl px-2 sm:px-2.5 py-1 sm:py-1.5 border border-gold-500/30 flex items-center gap-1 text-xs text-amber-200 shadow-md">
+            <Users className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="hidden lg:inline font-cinzel">Ghost Racers:</span>
+            <span className="font-bold text-cyan-300 text-xs sm:text-sm">{peers.length + 1}</span>
+            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
           </div>
 
           <button
             onClick={togglePause}
             title={isPaused ? 'Resume Dash' : 'Pause Dash (Esc)'}
-            className="p-2 rounded-xl border border-gold-500/30 bg-cosmic-900/90 text-amber-300 hover:text-amber-100 hover:bg-cosmic-800 transition-colors shadow-lg cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-xl border border-gold-500/30 bg-cosmic-900/90 text-amber-300 hover:text-amber-100 hover:bg-cosmic-800 transition-colors shadow-lg cursor-pointer touch-game-btn"
           >
             {isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4" />}
           </button>
@@ -934,8 +943,8 @@ export default function GameArena({ onNavigate }) {
         </div>
       )}
 
-      {/* Bottom Floating Tactical Bar (Desktop Controls) */}
-      <div className="absolute bottom-4 left-4 pointer-events-auto z-20 hidden sm:block">
+      {/* Bottom Floating Tactical Bar (Desktop & Laptop Keyboards) */}
+      <div className="absolute bottom-4 left-4 pointer-events-auto z-20 hidden lg:block">
         <div className="temple-glass rounded-2xl p-3 border border-gold-500/20 text-xs space-y-1 max-w-xs shadow-xl">
           <div className="flex items-center gap-1.5 text-amber-300 font-semibold font-cinzel">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -950,37 +959,41 @@ export default function GameArena({ onNavigate }) {
         </div>
       </div>
 
-      {/* Mobile Virtual Touch Controls */}
-      <div className="absolute bottom-4 inset-x-4 sm:hidden pointer-events-auto z-20 flex items-center justify-between">
-        <div className="flex gap-2">
+      {/* Cross-Device Virtual Touch Controls (Phones & Tablets) */}
+      <div className="absolute bottom-3 sm:bottom-6 inset-x-3 sm:inset-x-6 lg:hidden pointer-events-auto z-20 flex items-center justify-between safe-bottom">
+        <div className="flex gap-2 sm:gap-3">
           <button
             onClick={() => switchLane('left')}
-            className="w-13 h-13 rounded-2xl bg-cosmic-900/90 border border-gold-500/40 text-amber-300 flex items-center justify-center active:bg-saffron-600 shadow-xl"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cosmic-900/90 border-2 border-gold-500/40 text-amber-300 flex items-center justify-center active:bg-saffron-600 active:scale-90 shadow-2xl touch-game-btn"
+            aria-label="Dash Left"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className="w-7 h-7" />
           </button>
           <button
             onClick={() => switchLane('right')}
-            className="w-13 h-13 rounded-2xl bg-cosmic-900/90 border border-gold-500/40 text-amber-300 flex items-center justify-center active:bg-saffron-600 shadow-xl"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cosmic-900/90 border-2 border-gold-500/40 text-amber-300 flex items-center justify-center active:bg-saffron-600 active:scale-90 shadow-2xl touch-game-btn"
+            aria-label="Dash Right"
           >
-            <ArrowRight className="w-6 h-6" />
+            <ArrowRight className="w-7 h-7" />
           </button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 sm:gap-3">
           <button
             onClick={triggerSlide}
-            className="w-13 h-13 rounded-2xl bg-cosmic-900/90 border border-gold-500/40 text-amber-300 flex flex-col items-center justify-center active:bg-saffron-600 shadow-xl"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cosmic-900/90 border-2 border-gold-500/40 text-amber-300 flex flex-col items-center justify-center active:bg-saffron-600 active:scale-90 shadow-2xl touch-game-btn"
+            aria-label="Slide"
           >
-            <ArrowDown className="w-5 h-5" />
-            <span className="text-[9px] font-cinzel font-bold">SLIDE</span>
+            <ArrowDown className="w-6 h-6" />
+            <span className="text-[9px] font-cinzel font-bold tracking-wider">SLIDE</span>
           </button>
           <button
             onClick={triggerJump}
-            className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-saffron-600 to-gold-400 text-cosmic-950 flex flex-col items-center justify-center active:scale-95 shadow-xl font-bold"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-saffron-600 via-marigold to-gold-400 text-cosmic-950 flex flex-col items-center justify-center active:scale-90 shadow-2xl font-bold touch-game-btn"
+            aria-label="Jump"
           >
-            <ArrowUp className="w-5 h-5" />
-            <span className="text-[9px] font-cinzel">JUMP</span>
+            <ArrowUp className="w-6 h-6" />
+            <span className="text-[9px] font-cinzel font-bold tracking-wider">JUMP</span>
           </button>
         </div>
       </div>

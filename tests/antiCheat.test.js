@@ -1,6 +1,6 @@
 import { validateGameSession, generateClientSignature } from '../server/services/antiCheat.js';
 
-console.log('🧪 Running Celestial Dash Runner Anti-Cheat Validation Test Suite...\n');
+console.log('🧪 Running ModhakVerse Runner Anti-Cheat Validation Test Suite...\n');
 
 let passed = 0;
 let failed = 0;
