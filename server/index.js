@@ -267,33 +267,59 @@ app.post('/api/scores/submit', async (req, res) => {
 
     profileStore.set(user_id, existingProfile);
 
-    // Optional Supabase DB persistence
+    const GUEST_FALLBACK_UUID = '75305c97-42f8-4686-a591-33e055b62e3b';
+    const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    const targetUserId = isUuid(user_id) ? user_id : GUEST_FALLBACK_UUID;
+
+    // Supabase authoritative persistence
+    let supabasePersisted = false;
     if (supabase) {
       try {
-        await supabase.from('game_sessions').insert({
-          user_id,
+        // 1. Ensure profile exists so foreign key constraints succeed
+        await supabase.from('profiles').upsert({
+          id: targetUserId,
+          username: username || 'Celestial Seeker',
+          email: req.user?.email || `${(username || 'seeker').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@kailash.io`,
+          wisdom_rank: wisdom_rank
+        }, { onConflict: 'id' });
+
+        // 2. Insert validated game session
+        const { data: dbSession, error: dbErr } = await supabase.from('game_sessions').insert({
+          user_id: targetUserId,
           distance_traveled: finalDistance,
           modaks_collected,
           duration_seconds: finalDuration,
           final_score: authoritativeScore,
           hash_signature
-        });
-      } catch (dbErr) {
-        // Also support legacy table schema columns if applicable
-        try {
-          await supabase.from('game_sessions').insert({
-            user_id,
-            level_number: 1,
-            completion_time_seconds: finalDuration,
-            wisdom_points: Math.floor(finalDistance / 10),
-            modaks_collected,
-            pradakshina_completed: true,
-            final_score: authoritativeScore,
-            hash_signature
-          });
-        } catch (legacyErr) {
-          console.warn('Supabase DB insert note:', dbErr.message);
+        }).select().single();
+
+        if (dbErr) {
+          console.warn('Supabase game_sessions insert note:', dbErr.message);
+        } else {
+          supabasePersisted = true;
+          console.log(`✨ Successfully saved run to Supabase for ${username} (Score: ${authoritativeScore})`);
         }
+
+        // 3. Log user action audit trail
+        try {
+          await supabase.from('user_actions').insert({
+            user_id: targetUserId,
+            player_name: username,
+            action_type: 'GAME_COMPLETED',
+            action_description: `Finished Celestial Dash of ${finalDistance.toFixed(1)}m with ${modaks_collected} Modaks. Score: ${authoritativeScore} (${wisdom_rank}).`,
+            metadata: {
+              distance: finalDistance,
+              modaks: modaks_collected,
+              duration: finalDuration,
+              score: authoritativeScore,
+              wisdom_rank
+            }
+          });
+        } catch (actErr) {
+          // Table may not exist yet if migration hasn't been executed
+        }
+      } catch (err) {
+        console.warn('Supabase sync warning:', err.message);
       }
     }
 
@@ -304,6 +330,7 @@ app.post('/api/scores/submit', async (req, res) => {
       distance_traveled: finalDistance,
       modaks_collected,
       wisdom_rank,
+      supabase_synced: supabasePersisted,
       anti_cheat_status: 'AUTHENTICATED_AND_VERIFIED',
       metrics: validation.metrics
     });
@@ -318,14 +345,94 @@ app.post('/api/scores/submit', async (req, res) => {
 });
 
 /**
+ * POST /api/actions/log
+ * Actively logs in-game actions and milestones to Supabase
+ */
+app.post('/api/actions/log', async (req, res) => {
+  try {
+    const {
+      user_id,
+      player_name = 'Celestial Seeker',
+      action_type = 'MILESTONE',
+      action_description = 'Celestial action recorded',
+      metadata = {}
+    } = req.body;
+
+    const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    const targetUserId = isUuid(user_id) ? user_id : '75305c97-42f8-4686-a591-33e055b62e3b';
+
+    if (supabase) {
+      try {
+        await supabase.from('user_actions').insert({
+          user_id: targetUserId,
+          player_name,
+          action_type,
+          action_description,
+          metadata
+        });
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, logged: true });
+  } catch (err) {
+    return res.json({ success: true, logged: false });
+  }
+});
+
+/**
  * GET /api/leaderboard
- * Fetches top 50 ranked contest entries
+ * Fetches top 50 ranked contest entries directly from Supabase with in-memory fallback
  */
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const sortBy = req.query.sort || 'high_score'; // high_score | best_distance | modaks
 
-    // Clone and sort in-memory rankings
+    // 1. Try querying live Supabase database
+    if (supabase) {
+      try {
+        const { data: dbData, error: dbErr } = await supabase
+          .from('leaderboard')
+          .select('*')
+          .limit(50);
+
+        if (!dbErr && dbData && dbData.length > 0) {
+          let sortedDb = [...dbData];
+          if (sortBy === 'best_distance') {
+            sortedDb.sort((a, b) => (Number(b.best_distance) || 0) - (Number(a.best_distance) || 0));
+          } else if (sortBy === 'modaks') {
+            sortedDb.sort((a, b) => (Number(b.total_modaks) || 0) - (Number(a.total_modaks) || 0));
+          } else {
+            sortedDb.sort((a, b) => (Number(b.high_score) || 0) - (Number(a.high_score) || 0));
+          }
+
+          const topEntries = sortedDb.map((entry, index) => ({
+            rank: index + 1,
+            id: entry.user_id || `entry-${index}`,
+            username: entry.username || 'Celestial Pilgrim',
+            avatar_url: entry.avatar_url || null,
+            avatar_aspect: entry.avatar_aspect || 'Golden Mooshak',
+            wisdom_rank: entry.wisdom_rank || 'Devoted Pilgrim',
+            distance_traveled: Number(entry.best_distance) || 0,
+            modaks_collected: Number(entry.total_modaks) || 0,
+            final_score: Number(entry.high_score) || 0,
+            runs_completed: Number(entry.runs_completed) || 1,
+            verified: true,
+            source: 'supabase_cloud'
+          }));
+
+          return res.json({
+            success: true,
+            source: 'supabase_cloud',
+            total_contestants: topEntries.length,
+            leaderboard: topEntries
+          });
+        }
+      } catch (sbErr) {
+        console.warn('Leaderboard Supabase query note:', sbErr.message);
+      }
+    }
+
+    // 2. In-memory fallback
     let sorted = [...leaderboardStore];
     if (sortBy === 'best_distance') {
       sorted.sort((a, b) => (b.distance_traveled || 0) - (a.distance_traveled || 0));
@@ -335,14 +442,15 @@ app.get('/api/leaderboard', async (req, res) => {
       sorted.sort((a, b) => b.final_score - a.final_score);
     }
 
-    // Top 50 entries
     const topEntries = sorted.slice(0, 50).map((entry, index) => ({
       rank: index + 1,
-      ...entry
+      ...entry,
+      source: 'local_memory'
     }));
 
     return res.json({
       success: true,
+      source: 'local_memory',
       total_contestants: leaderboardStore.length,
       leaderboard: topEntries
     });
@@ -354,11 +462,13 @@ app.get('/api/leaderboard', async (req, res) => {
 
 /**
  * GET /api/profile/:id
- * Fetches player profile & statistics
+ * Fetches player profile & statistics from Supabase with fallback
  */
-app.get('/api/profile/:id', (req, res) => {
+app.get('/api/profile/:id', async (req, res) => {
   const userId = req.params.id;
-  const profile = profileStore.get(userId) || {
+  const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+  let profile = profileStore.get(userId) || {
     user_id: userId,
     username: 'Celestial Seeker',
     total_score: 0,
@@ -367,10 +477,54 @@ app.get('/api/profile/:id', (req, res) => {
     highest_score: 0,
     best_distance: 0,
     best_time: null,
-    achievements: ['Initiate of Kailash', 'Master of the Three Cosmic Lanes']
+    achievements: ['Initiate of Kailash', 'First Dash']
   };
 
-  const userRuns = leaderboardStore.filter(r => r.user_id === userId);
+  let userRuns = leaderboardStore.filter(r => r.user_id === userId);
+
+  // If Supabase is connected, query live database
+  if (supabase && isUuid(userId)) {
+    try {
+      const { data: dbProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const { data: dbRuns } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (dbProfile) {
+        profile = {
+          ...profile,
+          username: dbProfile.username || profile.username,
+          wisdom_rank: dbProfile.wisdom_rank || 'Celestial Seeker',
+          highest_score: dbProfile.highest_score || profile.highest_score,
+          best_distance: Number(dbProfile.best_distance_meters) || profile.best_distance,
+          modaks_total: dbProfile.total_modaks_collected || profile.modaks_total,
+          races_count: dbProfile.total_races_completed || profile.races_count,
+          avatar_aspect: dbProfile.avatar_aspect || 'Golden Mooshak'
+        };
+      }
+
+      if (dbRuns && dbRuns.length > 0) {
+        userRuns = dbRuns.map(r => ({
+          id: r.id,
+          distance_traveled: Number(r.distance_traveled),
+          modaks_collected: r.modaks_collected,
+          duration_seconds: Number(r.duration_seconds),
+          final_score: r.final_score,
+          created_at: r.created_at
+        }));
+      }
+    } catch (dbErr) {
+      console.warn('Profile Supabase query note:', dbErr.message);
+    }
+  }
 
   return res.json({
     success: true,

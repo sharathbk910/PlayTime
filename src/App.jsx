@@ -7,18 +7,48 @@ import GameArena from './pages/GameArena';
 import LeaderboardPage from './pages/LeaderboardPage';
 import DashboardPage from './pages/DashboardPage';
 import { audioEngine } from './utils/audioEngine';
+import { supabase, isLiveSupabaseConfigured, localAuth, syncUserProfile } from './utils/supabaseClient';
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
     return window.location.pathname || '/';
   });
 
-  // Keep path in sync with browser history
+  // Keep path in sync with browser history & handle Google OAuth redirect
   useEffect(() => {
     const handlePopState = () => {
       setCurrentRoute(window.location.pathname || '/');
     };
     window.addEventListener('popstate', handlePopState);
+
+    // Supabase auth state listener (captures Google OAuth redirects & session changes)
+    if (isLiveSupabaseConfigured && supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          const userMeta = session.user.user_metadata || {};
+          const syncedUser = {
+            id: session.user.id,
+            username: userMeta.full_name || userMeta.name || session.user.email?.split('@')[0] || 'Celestial Seeker',
+            email: session.user.email,
+            avatar_url: userMeta.avatar_url || userMeta.picture || null,
+            provider: session.user.app_metadata?.provider || 'google'
+          };
+          localAuth.setUser(syncedUser, true);
+          await syncUserProfile(syncedUser);
+
+          // Clean up OAuth tokens from URL if present
+          if (window.location.hash && window.location.hash.includes('access_token')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        }
+      });
+
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+        subscription?.unsubscribe();
+      };
+    }
+
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 

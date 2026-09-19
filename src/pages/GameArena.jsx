@@ -15,7 +15,13 @@ import {
   Gauge,
   Heart,
   Repeat,
-  AlertOctagon
+  AlertOctagon,
+  Pause,
+  Play,
+  Copy,
+  Check,
+  Flame,
+  CloudCheck
 } from 'lucide-react';
 import GameViewport from '../components/GameViewport';
 import { TRACK_LANES } from '../utils/constants';
@@ -23,12 +29,12 @@ import RiddleModal from '../components/RiddleModal';
 import { useMultiplayer } from '../hooks/useMultiplayer';
 import { RunnerTelemetryTracker } from '../utils/antiCheatClient';
 import { audioEngine } from '../utils/audioEngine';
-import { localAuth, supabase, isLiveSupabaseConfigured } from '../utils/supabaseClient';
+import { localAuth, supabase, isLiveSupabaseConfigured, logUserAction, CELESTIAL_GUEST_UUID } from '../utils/supabaseClient';
 
 export default function GameArena({ onNavigate }) {
   // Player state & Auth
   const [currentUser, setCurrentUser] = useState(() => localAuth.getUser() || {
-    id: `seeker-${Date.now().toString(36)}`,
+    id: CELESTIAL_GUEST_UUID,
     username: 'Celestial Seeker'
   });
 
@@ -46,13 +52,18 @@ export default function GameArena({ onNavigate }) {
   // Gameplay Run State
   const [isRunning, setIsRunning] = useState(false);
   const [runFinished, setRunFinished] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [countdown, setCountdown] = useState(null); // 3, 2, 1, 'DASH!' or null
   const [elapsedTime, setElapsedTime] = useState(0);
   const [distanceTraveled, setDistanceTraveled] = useState(0);
   const [modaksCollected, setModaksCollected] = useState(0);
   const [multiplier, setMultiplier] = useState(1);
+  const [combo, setCombo] = useState(0);
   const [score, setScore] = useState(0);
   const [revivesCount, setRevivesCount] = useState(0);
   const [currentLevel, setCurrentLevel] = useState(1);
+  const [milestoneToast, setMilestoneToast] = useState(null);
+  const [copiedShare, setCopiedShare] = useState(false);
 
   // Divine Gate & Anti-Cheat Submissions
   const [isDivineGateOpen, setIsDivineGateOpen] = useState(false);
@@ -72,6 +83,8 @@ export default function GameArena({ onNavigate }) {
   const isSlidingRef = useRef(false);
   const isInvulnerableRef = useRef(false);
   const isRunningRef = useRef(false);
+  const isPausedRef = useRef(false);
+  const countdownRef = useRef(null);
   const isDivineGateOpenRef = useRef(false);
   const runFinishedRef = useRef(false);
   const obstaclesRef = useRef([]);
@@ -84,6 +97,9 @@ export default function GameArena({ onNavigate }) {
   const lastBroadcastTime = useRef(0);
   const modaksCollectedRef = useRef(0);
   const distanceTraveledRef = useRef(0);
+  const lastModakTimeRef = useRef(0);
+  const comboRef = useRef(0);
+  const lastMilestoneRef = useRef(0);
 
   // Keep refs in sync with state for callbacks
   currentLaneRef.current = currentLane;
@@ -91,6 +107,8 @@ export default function GameArena({ onNavigate }) {
   isSlidingRef.current = isSliding;
   isInvulnerableRef.current = isInvulnerable;
   isRunningRef.current = isRunning;
+  isPausedRef.current = isPaused;
+  countdownRef.current = countdown;
   isDivineGateOpenRef.current = isDivineGateOpen;
   runFinishedRef.current = runFinished;
   obstaclesRef.current = obstacles;
@@ -114,14 +132,13 @@ export default function GameArena({ onNavigate }) {
   }, []);
 
   // Procedural Track Generator:
-  // Ensures safe start runway (Z = 0 to 60 has NO obstacles, only modaks!)
   const generateTrackSegment = useCallback((fromZ, toZ) => {
     const newObstacles = [];
     const newModaks = [];
     const obstacleTypes = ['rolling_pillar', 'fire_pit', 'floating_arch', 'demon_guardian'];
 
     for (let z = fromZ; z < toZ; z += 24) {
-      // If z < 60, only place sweet golden modaks for safe takeoff!
+      // Safe runway: If z < 60, only place sweet golden modaks
       if (z < 60) {
         for (let offset = -6; offset <= 6; offset += 3) {
           newModaks.push({
@@ -135,36 +152,36 @@ export default function GameArena({ onNavigate }) {
         continue;
       }
 
-      // Pick 1 or 2 lanes to block, always leaving at least 1 open lane!
+      // Pick 1 or 2 lanes to block, leaving at least 1 open lane
       const blockedLaneIndices = [];
       const numBlocked = Math.random() < 0.65 ? 1 : 2;
+      const shuffledLanes = [0, 1, 2].sort(() => 0.5 - Math.random());
 
-      while (blockedLaneIndices.length < numBlocked) {
-        const randLane = Math.floor(Math.random() * 3);
-        if (!blockedLaneIndices.includes(randLane)) {
-          blockedLaneIndices.push(randLane);
-        }
+      for (let i = 0; i < numBlocked; i++) {
+        blockedLaneIndices.push(shuffledLanes[i]);
       }
 
-      // Spawn obstacles in blocked lanes
+      // Place obstacles in chosen lanes
       blockedLaneIndices.forEach((laneIdx) => {
         const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
         newObstacles.push({
           id: `obs-${z}-${laneIdx}`,
+          type,
           x: TRACK_LANES[laneIdx],
+          y: type === 'floating_arch' ? 1.6 : 0.4,
           z,
-          type
+          lane: laneIdx
         });
       });
 
-      // Spawn Modaks in the open lane(s)
-      const openLanes = [0, 1, 2].filter((l) => !blockedLaneIndices.includes(l));
-      const modakLane = openLanes[Math.floor(Math.random() * openLanes.length)] ?? 1;
+      // Place Modaks in unblocked open lane
+      const openLanes = [0, 1, 2].filter((idx) => !blockedLaneIndices.includes(idx));
+      const rewardLane = openLanes[0] ?? 1;
 
-      for (let offset = -6; offset <= 6; offset += 3) {
+      for (let offset = -4; offset <= 4; offset += 4) {
         newModaks.push({
-          id: `modak-${z + offset}-${modakLane}`,
-          x: TRACK_LANES[modakLane],
+          id: `modak-${z + offset}-${rewardLane}`,
+          x: TRACK_LANES[rewardLane],
           y: 0.5,
           z: z + offset,
           collected: false
@@ -175,7 +192,7 @@ export default function GameArena({ onNavigate }) {
     return { newObstacles, newModaks };
   }, []);
 
-  // Initialize or Restart Runner Dash
+  // Initialize or Restart Runner Dash with 3-2-1 Countdown
   const startRun = useCallback(() => {
     setCurrentLane(1);
     currentLaneRef.current = 1;
@@ -189,19 +206,25 @@ export default function GameArena({ onNavigate }) {
     setIsSliding(false);
     setIsInvulnerable(false);
     setIsFouled(false);
+    setIsPaused(false);
+    isPausedRef.current = false;
     setFoulMessage('');
 
     setElapsedTime(0);
     setDistanceTraveled(0);
     setModaksCollected(0);
     setMultiplier(1);
+    setCombo(0);
+    comboRef.current = 0;
+    lastMilestoneRef.current = 0;
     setScore(0);
     setRevivesCount(0);
     setCurrentLevel(1);
     modaksCollectedRef.current = 0;
     distanceTraveledRef.current = 0;
 
-    setIsRunning(true);
+    setIsRunning(false);
+    isRunningRef.current = false;
     setRunFinished(false);
     setIsDivineGateOpen(false);
     setSubmissionResult(null);
@@ -220,9 +243,38 @@ export default function GameArena({ onNavigate }) {
     telemetryRef.current = tracker;
 
     lastFrameTime.current = performance.now();
-
-    audioEngine.playTempleBell(528);
     audioEngine.startAmbientDrone();
+
+    // Trigger 3... 2... 1... DASH! countdown
+    setCountdown(3);
+    countdownRef.current = 3;
+    audioEngine.playTempleBell(440);
+
+    let count = 3;
+    const countTimer = setInterval(() => {
+      count -= 1;
+      if (count === 2) {
+        setCountdown(2);
+        countdownRef.current = 2;
+        audioEngine.playTempleBell(528);
+      } else if (count === 1) {
+        setCountdown(1);
+        countdownRef.current = 1;
+        audioEngine.playTempleBell(660);
+      } else if (count === 0) {
+        setCountdown('DASH!');
+        countdownRef.current = 'DASH!';
+        audioEngine.playTempleBell(880);
+      } else {
+        clearInterval(countTimer);
+        setCountdown(null);
+        countdownRef.current = null;
+        setIsRunning(true);
+        isRunningRef.current = true;
+        lastFrameTime.current = performance.now();
+        logUserAction('GAME_START', 'Devotee launched Celestial Dash on 3 cosmic lanes');
+      }
+    }, 850);
   }, [currentUser.id, generateTrackSegment]);
 
   useEffect(() => {
@@ -231,16 +283,16 @@ export default function GameArena({ onNavigate }) {
 
   // Timer Tick
   useEffect(() => {
-    if (!isRunning || runFinished || isDivineGateOpen) return;
+    if (!isRunning || runFinished || isDivineGateOpen || isPaused) return;
     const interval = setInterval(() => {
       setElapsedTime((prev) => prev + 0.1);
     }, 100);
     return () => clearInterval(interval);
-  }, [isRunning, runFinished, isDivineGateOpen]);
+  }, [isRunning, runFinished, isDivineGateOpen, isPaused]);
 
-  // Lane Switch Control Handler (Left = 0, Center = 1, Right = 2)
+  // Lane Switch Control Handler
   const switchLane = useCallback((direction) => {
-    if (!isRunningRef.current || runFinishedRef.current || isDivineGateOpenRef.current) return;
+    if (!isRunningRef.current || runFinishedRef.current || isDivineGateOpenRef.current || isPausedRef.current) return;
     setCurrentLane((prev) => {
       let next = prev;
       if (direction === 'left' && prev > 0) next = prev - 1;
@@ -256,6 +308,7 @@ export default function GameArena({ onNavigate }) {
       !isRunningRef.current ||
       runFinishedRef.current ||
       isDivineGateOpenRef.current ||
+      isPausedRef.current ||
       isJumpingRef.current
     )
       return;
@@ -278,7 +331,6 @@ export default function GameArena({ onNavigate }) {
         setIsJumping(false);
         isJumpingRef.current = false;
       } else {
-        // Parabolic jump arc peaking at 1.85m
         const y = Math.sin(progress * Math.PI) * 1.85;
         jumpYRef.current = y;
         setJumpY(y);
@@ -292,6 +344,7 @@ export default function GameArena({ onNavigate }) {
       !isRunningRef.current ||
       runFinishedRef.current ||
       isDivineGateOpenRef.current ||
+      isPausedRef.current ||
       isSlidingRef.current
     )
       return;
@@ -306,12 +359,33 @@ export default function GameArena({ onNavigate }) {
     }, 680);
   }, []);
 
-  // Keyboard Event Listeners (WASD + Arrows + Space)
+  // Pause / Resume Toggle Handler
+  const togglePause = useCallback(() => {
+    if (runFinishedRef.current || isDivineGateOpenRef.current || countdownRef.current !== null) return;
+    setIsPaused((prev) => {
+      const nextP = !prev;
+      isPausedRef.current = nextP;
+      if (nextP) {
+        audioEngine.playTempleBell(440);
+      } else {
+        lastFrameTime.current = performance.now();
+        audioEngine.playTempleBell(660);
+      }
+      return nextP;
+    });
+  }, []);
+
+  // Keyboard Event Listeners (WASD + Arrows + Space + Escape)
   useEffect(() => {
     const handleKeyDown = (e) => {
       const key = e.key.toLowerCase();
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) {
         e.preventDefault();
+      }
+
+      if (key === 'escape' || key === 'p') {
+        togglePause();
+        return;
       }
 
       if (key === 'arrowleft' || key === 'a') switchLane('left');
@@ -322,11 +396,10 @@ export default function GameArena({ onNavigate }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [switchLane, triggerJump, triggerSlide]);
+  }, [switchLane, triggerJump, triggerSlide, togglePause]);
 
-  // Touch Swipe Event Listeners (Mobile Gesture Support)
+  // Touch Swipe Gesture Handlers (Mobile)
   const handleTouchStart = (e) => {
-    if (!e.touches || e.touches.length === 0) return;
     touchStartPos.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY
@@ -334,64 +407,75 @@ export default function GameArena({ onNavigate }) {
   };
 
   const handleTouchEnd = (e) => {
-    if (!touchStartPos.current || !e.changedTouches || e.changedTouches.length === 0) return;
-    const dx = e.changedTouches[0].clientX - touchStartPos.current.x;
-    const dy = e.changedTouches[0].clientY - touchStartPos.current.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
+    if (!touchStartPos.current) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartPos.current.x;
+    const deltaY = e.changedTouches[0].clientY - touchStartPos.current.y;
 
-    if (Math.max(absDx, absDy) > 28) {
-      if (absDx > absDy) {
-        if (dx > 0) switchLane('right');
-        else switchLane('left');
-      } else {
-        if (dy < 0) triggerJump();
-        else triggerSlide();
-      }
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX > 35) switchLane('right');
+      else if (deltaX < -35) switchLane('left');
+    } else {
+      if (deltaY < -35) triggerJump();
+      else if (deltaY > 35) triggerSlide();
     }
     touchStartPos.current = null;
   };
 
-  // High Performance 60FPS Animation Frame Physics Loop
+  // Main 60FPS Game Loop
   useEffect(() => {
     let active = true;
 
     const loop = (time) => {
       if (!active) return;
 
-      const deltaMs = Math.min(60, time - lastFrameTime.current);
+      const dt = Math.min((time - lastFrameTime.current) / 1000, 0.1);
       lastFrameTime.current = time;
-      const dt = deltaMs / 1000;
 
-      if (isRunningRef.current && !runFinishedRef.current && !isDivineGateOpenRef.current) {
-        // Runner Speed: comfortable, controlled, fair pacing
-        // Base speed: 7.5 m/s, gradually increases with distance up to 13 m/s
-        const currentZ = playerZRef.current;
-        const currentSpeed = 7.5 + Math.min(5.5, (currentZ / 100) * 1.2);
-        const nextZ = currentZ + currentSpeed * dt;
+      // Only advance if game is actively running, not paused, and not in trivia modal
+      if (
+        isRunningRef.current &&
+        !runFinishedRef.current &&
+        !isDivineGateOpenRef.current &&
+        !isPausedRef.current &&
+        countdownRef.current === null
+      ) {
+        // Dynamic speed curve
+        const baseSpeed = 16.5;
+        const speedBonus = Math.min(distanceTraveledRef.current * 0.008, 11.5);
+        const speed = baseSpeed + speedBonus;
+
+        // Advance runner Z
+        const nextZ = playerZRef.current + speed * dt;
         playerZRef.current = nextZ;
-
-        // Smoothly interpolate playerX towards target lane
-        const targetX = TRACK_LANES[currentLaneRef.current];
-        playerXRef.current += (targetX - playerXRef.current) * Math.min(1, dt * 14);
-
-        // Update React rendering states
         setPlayerZ(nextZ);
-        setPlayerX(playerXRef.current);
-        const dist = Number(nextZ.toFixed(1));
-        distanceTraveledRef.current = dist;
-        setDistanceTraveled(dist);
+        setDistanceTraveled(nextZ);
+        distanceTraveledRef.current = nextZ;
 
-        // Level Milestones: Level 1 (0-150m), Level 2 (150-300m), Level 3 (300-500m)...
-        const newLevel = Math.floor(nextZ / 150) + 1;
+        // Smooth X lane lerping
+        const targetX = TRACK_LANES[currentLaneRef.current];
+        playerXRef.current += (targetX - playerXRef.current) * Math.min(1, 15 * dt);
+        setPlayerX(playerXRef.current);
+
+        // Level progressions
+        const newLevel = Math.min(5, Math.floor(nextZ / 300) + 1);
         setCurrentLevel(newLevel);
 
-        // 1. Anti-Cheat Checkpoint
+        // Milestone Toasts
+        const milestoneCheck = Math.floor(nextZ / 250) * 250;
+        if (milestoneCheck > 0 && milestoneCheck > lastMilestoneRef.current) {
+          lastMilestoneRef.current = milestoneCheck;
+          setMilestoneToast(`⚡ ${milestoneCheck}m Celestial Milestone Reached!`);
+          audioEngine.playDivineWisdomChime();
+          logUserAction('MILESTONE', `Reached ${milestoneCheck}m on cosmic highway`, { distance: milestoneCheck });
+          setTimeout(() => setMilestoneToast(null), 3000);
+        }
+
+        // 1. Anti-Cheat Telemetry recording
         if (telemetryRef.current) {
           telemetryRef.current.recordCheckpoint('move', playerXRef.current, nextZ);
         }
 
-        // 2. Throttled Multiplayer Broadcast (every 100ms)
+        // 2. Multiplayer Broadcast (every 100ms)
         if (time - lastBroadcastTime.current > 100) {
           lastBroadcastTime.current = time;
           broadcastPosition(Number(playerXRef.current.toFixed(2)), Number(nextZ.toFixed(2)), {
@@ -413,9 +497,20 @@ export default function GameArena({ onNavigate }) {
               modakPicked = true;
               audioEngine.playModakPickup();
               modaksCollectedRef.current += 1;
+
+              // Combo tracking
+              const now = performance.now();
+              if (now - lastModakTimeRef.current < 2000) {
+                comboRef.current += 1;
+              } else {
+                comboRef.current = 1;
+              }
+              lastModakTimeRef.current = now;
+              setCombo(comboRef.current);
+
               setModaksCollected((c) => {
                 const nextC = c + 1;
-                setScore(Math.floor(nextZ * 10 + nextC * 75 * multiplier));
+                setScore(Math.floor(nextZ * 10 + nextC * 75 * multiplier + comboRef.current * 15));
                 return nextC;
               });
             }
@@ -432,17 +527,14 @@ export default function GameArena({ onNavigate }) {
           for (let i = 0; i < activeObstacles.length; i++) {
             const obs = activeObstacles[i];
 
-            // Check if Mooshak is within the obstacle's bounding box
             if (Math.abs(obs.z - nextZ) < 1.15 && Math.abs(obs.x - playerXRef.current) < 1.05) {
               let avoided = false;
 
               if (obs.type === 'rolling_pillar' || obs.type === 'fire_pit') {
-                // Low obstacles: must jump with adequate height
                 if (isJumpingRef.current && jumpYRef.current > 0.75) {
                   avoided = true;
                 }
               } else if (obs.type === 'floating_arch') {
-                // High obstacles: must slide under
                 if (isSlidingRef.current) {
                   avoided = true;
                 }
@@ -452,12 +544,11 @@ export default function GameArena({ onNavigate }) {
                 // FOUL TRIGGERED!
                 audioEngine.playCollisionSound();
 
-                // Remove this obstacle so it never collides again
+                // Remove obstacle
                 const filteredObs = activeObstacles.filter((o) => o.id !== obs.id);
                 obstaclesRef.current = filteredObs;
                 setObstacles(filteredObs);
 
-                // Set Foul State & Pause
                 setIsFouled(true);
                 setFoulMessage(
                   obs.type === 'rolling_pillar'
@@ -511,9 +602,8 @@ export default function GameArena({ onNavigate }) {
     };
   }, [generateTrackSegment, multiplier, broadcastPosition]);
 
-  // Handle Divine Gate Trivia Resolution (Clear Foul & Extra Life vs Run Concluded)
+  // Handle Divine Gate Trivia Resolution
   const handleTriviaResolved = ({ puzzleId, startTime, solveTime, isCorrect }) => {
-    // Record puzzle telemetry for anti-cheat
     if (telemetryRef.current) {
       telemetryRef.current.recordTriviaAttempt(puzzleId, startTime, solveTime, isCorrect);
     }
@@ -528,11 +618,11 @@ export default function GameArena({ onNavigate }) {
       setRevivesCount((r) => r + 1);
       setMultiplier((m) => m + 1);
 
-      // Advance player slightly past obstacle location so no re-collision occurs
+      // Advance slightly past obstacle
       playerZRef.current += 3.5;
       setPlayerZ(playerZRef.current);
 
-      // 3.0 Seconds Invulnerability grace period with glowing shield
+      // 3.0 Seconds Invulnerability grace period
       setIsInvulnerable(true);
       isInvulnerableRef.current = true;
 
@@ -542,8 +632,8 @@ export default function GameArena({ onNavigate }) {
       }, 3000);
 
       audioEngine.playReviveFanfare();
+      logUserAction('DIVINE_GATE_SOLVED', 'Solved Gemini AI mythological riddle and earned Divine Shield', { puzzleId });
     } else {
-      // Run concluded
       setIsDivineGateOpen(false);
       isDivineGateOpenRef.current = false;
       handleFinishRun();
@@ -561,14 +651,13 @@ export default function GameArena({ onNavigate }) {
 
     audioEngine.playShankhaBlast();
     confetti({
-      particleCount: 110,
-      spread: 70,
+      particleCount: 120,
+      spread: 80,
       origin: { y: 0.6 }
     });
 
     try {
       const tracker = telemetryRef.current;
-      // Use refs to get accurate final values (avoids stale React state closures)
       const finalDistance = distanceTraveledRef.current || playerZRef.current;
       const finalModaks = modaksCollectedRef.current;
       const payload = await tracker.buildSubmissionPayload({
@@ -587,6 +676,10 @@ export default function GameArena({ onNavigate }) {
 
       const data = await response.json();
       setSubmissionResult(data);
+      logUserAction('GAME_COMPLETED', `Concluded run: ${finalDistance.toFixed(1)}m with ${finalModaks} Modaks. Score: ${data.authoritativeScore || score}`, {
+        distance: finalDistance,
+        score: data.authoritativeScore || score
+      });
     } catch (err) {
       console.error('Submission error:', err);
       setSubmissionResult({
@@ -596,6 +689,16 @@ export default function GameArena({ onNavigate }) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Copy shareable run card to clipboard
+  const handleCopyShareCard = () => {
+    const finalDist = distanceTraveled.toFixed(1);
+    const shareText = `🛕 Celestial Dash: Mooshak's Quest\n🏆 Score: ${score} points\n⚡ Distance Dashed: ${finalDist}m\n🥮 Modaks Gathered: ${modaksCollected}\nCan you outrun Mooshak across Mount Kailash? Play now: ${window.location.origin}`;
+    navigator.clipboard.writeText(shareText);
+    setCopiedShare(true);
+    audioEngine.playTempleBell(740);
+    setTimeout(() => setCopiedShare(false), 2500);
   };
 
   return (
@@ -623,7 +726,7 @@ export default function GameArena({ onNavigate }) {
         {/* Left HUD: Distance & Level */}
         <div className="flex items-center gap-2 pointer-events-auto">
           {/* Distance Counter */}
-          <div className="temple-glass rounded-xl px-3 py-1.5 border border-gold-500/30 flex items-center gap-2 shadow-lg">
+          <div className="temple-glass rounded-2xl px-3.5 py-1.5 border border-gold-500/30 flex items-center gap-2 shadow-lg">
             <Gauge className="w-4 h-4 text-marigold" />
             <span className="font-mono text-sm sm:text-base font-bold text-amber-100">
               {distanceTraveled.toFixed(0)}m
@@ -631,54 +734,93 @@ export default function GameArena({ onNavigate }) {
           </div>
 
           {/* Current Level Badge */}
-          <div className="temple-glass rounded-xl px-3 py-1.5 border border-saffron-500/30 bg-saffron-950/40 flex items-center gap-1.5 shadow-lg">
+          <div className="temple-glass rounded-2xl px-3 py-1.5 border border-saffron-500/30 bg-saffron-950/40 flex items-center gap-1.5 shadow-lg">
             <span className="text-xs font-bold text-amber-300 font-cinzel">
               Level {currentLevel}
             </span>
           </div>
 
           {/* Modak Count */}
-          <div className="temple-glass rounded-xl px-3 py-1.5 border border-gold-500/30 flex items-center gap-1.5 shadow-lg">
+          <div className="temple-glass rounded-2xl px-3 py-1.5 border border-gold-500/30 flex items-center gap-1.5 shadow-lg">
             <span className="text-base">🥮</span>
-            <span className="text-xs sm:text-sm font-bold text-amber-200 font-cinzel">
+            <span className="text-xs sm:text-sm font-bold text-amber-200 font-mono">
               {modaksCollected}
             </span>
           </div>
         </div>
 
-        {/* Center HUD: Dynamic Score & Multiplier */}
+        {/* Center HUD: Dynamic Score & Combo */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="temple-glass rounded-xl px-4 py-1.5 border border-gold-divine/40 bg-saffron-950/40 flex items-center gap-2 shadow-xl">
+          <div className="temple-glass rounded-2xl px-4 py-1.5 border border-gold-divine/40 bg-saffron-950/50 flex items-center gap-2 shadow-xl">
             <Sparkles className="w-4 h-4 text-marigold animate-pulse" />
-            <span className="text-xs uppercase font-cinzel text-amber-300 tracking-wider">
+            <span className="text-xs uppercase font-cinzel text-amber-300 tracking-wider hidden sm:inline">
               Score:
             </span>
-            <span className="text-base sm:text-lg font-bold text-amber-100 font-mythic">
+            <span className="text-base sm:text-lg font-bold text-amber-100 font-mythic glow-text-gold">
               {score}
             </span>
           </div>
 
+          {combo >= 2 && (
+            <div className="temple-glass rounded-2xl px-2.5 py-1.5 border border-saffron-500/50 bg-saffron-900/40 text-amber-200 text-xs font-bold font-cinzel flex items-center gap-1 animate-pulse shadow-md">
+              <Flame className="w-3.5 h-3.5 text-marigold fill-current" />
+              <span>Streak x{combo}</span>
+            </div>
+          )}
+
           {multiplier > 1 && (
-            <div className="temple-glass rounded-xl px-2.5 py-1.5 border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 text-xs font-bold font-cinzel flex items-center gap-1 animate-bounce">
+            <div className="temple-glass rounded-2xl px-2.5 py-1.5 border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 text-xs font-bold font-cinzel flex items-center gap-1 shadow-md">
               <Zap className="w-3.5 h-3.5 fill-emerald-400" />
               <span>{multiplier}x Multiplier</span>
             </div>
           )}
         </div>
 
-        {/* Right HUD: Ghost Multiplayer Status */}
+        {/* Right HUD: Pause & Multiplayer Status */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="temple-glass rounded-xl px-2.5 py-1.5 border border-gold-500/30 flex items-center gap-1.5 text-xs text-amber-200">
+          <div className="temple-glass rounded-2xl px-2.5 py-1.5 border border-gold-500/30 flex items-center gap-1.5 text-xs text-amber-200 shadow-md">
             <Users className="w-3.5 h-3.5 text-cyan-400" />
             <span className="hidden md:inline font-cinzel">Ghost Racers:</span>
             <span className="font-bold text-cyan-300">{peers.length + 1}</span>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
           </div>
+
+          <button
+            onClick={togglePause}
+            title={isPaused ? 'Resume Dash' : 'Pause Dash (Esc)'}
+            className="p-2 rounded-xl border border-gold-500/30 bg-cosmic-900/90 text-amber-300 hover:text-amber-100 hover:bg-cosmic-800 transition-colors shadow-lg cursor-pointer"
+          >
+            {isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4" />}
+          </button>
         </div>
       </div>
 
+      {/* Pre-Dash Countdown Overlay */}
+      {countdown !== null && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-cosmic-950/70 backdrop-blur-sm pointer-events-none">
+          <div className="text-center animate-in zoom-in-75 duration-200">
+            <span className="block text-7xl sm:text-9xl font-black font-mythic text-amber-200 glow-text-gold tracking-widest drop-shadow-[0_0_50px_rgba(255,215,0,0.9)]">
+              {countdown}
+            </span>
+            <span className="block text-sm sm:text-base font-cinzel text-amber-300/80 uppercase tracking-widest mt-4">
+              Mount Kailash Gates Opening...
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Milestone Banner */}
+      {milestoneToast && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in slide-in-from-top duration-300">
+          <div className="px-6 py-2 rounded-2xl bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 text-cosmic-950 font-cinzel font-bold text-sm uppercase tracking-widest shadow-2xl flex items-center gap-2">
+            <Sparkles className="w-5 h-5 fill-cosmic-950" />
+            <span>{milestoneToast}</span>
+          </div>
+        </div>
+      )}
+
       {/* Foul Alert Notification Banner */}
-      {isFouled && (
+      {isFouled && !isDivineGateOpen && (
         <div className="absolute top-18 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
           <div className="px-5 py-2 rounded-2xl bg-rose-950/90 border-2 border-rose-500 text-rose-100 font-cinzel text-xs sm:text-sm font-bold uppercase tracking-widest shadow-2xl flex items-center gap-2 animate-bounce">
             <AlertOctagon className="w-5 h-5 text-rose-400 animate-pulse" />
@@ -697,25 +839,78 @@ export default function GameArena({ onNavigate }) {
         </div>
       )}
 
-      {/* Bottom Floating Tactical Bar (Desktop Keyboard Controls Info) */}
+      {/* Pause Modal Overlay */}
+      {isPaused && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cosmic-950/80 backdrop-blur-md">
+          <div className="relative w-full max-w-sm rounded-3xl temple-glass-gold border-2 border-gold-temple p-6 text-center shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 rounded-2xl bg-saffron-950/60 border border-gold-400/40 mx-auto mb-3 flex items-center justify-center text-2xl">
+              ⏸️
+            </div>
+            <h3 className="text-2xl font-bold font-mythic text-amber-100 glow-text-gold">
+              Sacred Meditation
+            </h3>
+            <p className="text-xs text-amber-300/80 font-cinzel mt-1 mb-6">
+              Cosmic Dash is temporarily paused
+            </p>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between text-xs font-cinzel border-b border-gold-500/20 pb-2">
+                <span className="text-amber-300/70">Distance Dashed:</span>
+                <span className="font-mono text-amber-100 font-bold">{distanceTraveled.toFixed(1)}m</span>
+              </div>
+              <div className="flex justify-between text-xs font-cinzel border-b border-gold-500/20 pb-2">
+                <span className="text-amber-300/70">Modaks Gathered:</span>
+                <span className="font-mono text-marigold font-bold">{modaksCollected} 🥮</span>
+              </div>
+              <div className="flex justify-between text-xs font-cinzel">
+                <span className="text-amber-300/70">Current Score:</span>
+                <span className="font-mono text-gold-divine font-bold">{score}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={togglePause}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-saffron-600 to-gold-400 text-cosmic-950 font-bold font-cinzel text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>Resume Dash</span>
+              </button>
+              <button
+                onClick={startRun}
+                className="w-full py-2.5 rounded-xl border border-gold-500/30 hover:bg-white/5 text-amber-200 text-xs font-cinzel transition-colors cursor-pointer"
+              >
+                Restart Dash
+              </button>
+              <button
+                onClick={() => onNavigate('/')}
+                className="w-full py-2 rounded-xl text-amber-400/70 hover:text-amber-200 text-xs font-cinzel transition-colors cursor-pointer"
+              >
+                Return to Temple Realm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Floating Tactical Bar (Desktop Controls) */}
       <div className="absolute bottom-4 left-4 pointer-events-auto z-20 hidden sm:block">
         <div className="temple-glass rounded-2xl p-3 border border-gold-500/20 text-xs space-y-1 max-w-xs shadow-xl">
           <div className="flex items-center gap-1.5 text-amber-300 font-semibold font-cinzel">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Celestial Anti-Cheat: Telemetry Active</span>
+            <span>Anti-Cheat Telemetry Active</span>
           </div>
-          <p className="text-[11px] text-amber-200/80">
-            <span className="text-amber-100 font-mono">A / &larr;</span>: Move Left &bull;{' '}
-            <span className="text-amber-100 font-mono">D / &rarr;</span>: Move Right &bull;{' '}
-            <span className="text-amber-100 font-mono">W / &uarr; / Space</span>: Jump &bull;{' '}
-            <span className="text-amber-100 font-mono">S / &darr;</span>: Slide
+          <p className="text-[11px] text-amber-200/80 font-mono">
+            <kbd className="px-1.5 py-0.5 rounded bg-cosmic-950 border border-gold-500/40 text-amber-300">A/&larr;</kbd> Left &bull;{' '}
+            <kbd className="px-1.5 py-0.5 rounded bg-cosmic-950 border border-gold-500/40 text-amber-300">D/&rarr;</kbd> Right &bull;{' '}
+            <kbd className="px-1.5 py-0.5 rounded bg-cosmic-950 border border-gold-500/40 text-amber-300">Space</kbd> Jump &bull;{' '}
+            <kbd className="px-1.5 py-0.5 rounded bg-cosmic-950 border border-gold-500/40 text-amber-300">S/&darr;</kbd> Slide
           </p>
         </div>
       </div>
 
-      {/* Mobile Virtual Touch Controls (Left, Right, Jump, Slide) */}
+      {/* Mobile Virtual Touch Controls */}
       <div className="absolute bottom-4 inset-x-4 sm:hidden pointer-events-auto z-20 flex items-center justify-between">
-        {/* Left / Right Lane Buttons */}
         <div className="flex gap-2">
           <button
             onClick={() => switchLane('left')}
@@ -731,7 +926,6 @@ export default function GameArena({ onNavigate }) {
           </button>
         </div>
 
-        {/* Jump & Slide Buttons */}
         <div className="flex gap-2">
           <button
             onClick={triggerSlide}
@@ -750,7 +944,7 @@ export default function GameArena({ onNavigate }) {
         </div>
       </div>
 
-      {/* Divine Gate Trivia Modal (Triggered when hitting an obstacle / foul) */}
+      {/* Divine Gate Trivia Modal */}
       <RiddleModal
         isOpen={isDivineGateOpen}
         foulMessage={foulMessage}
@@ -781,13 +975,13 @@ export default function GameArena({ onNavigate }) {
             <h3 className="text-2xl sm:text-3xl font-bold font-mythic text-amber-100 glow-text-gold">
               Celestial Dash Concluded!
             </h3>
-            <p className="text-xs text-amber-300/80 font-cinzel mt-1 mb-6">
+            <p className="text-xs text-amber-300/80 font-cinzel mt-1 mb-5">
               "Mooshak's devotion shines across the celestial sphere"
             </p>
 
             {/* Run Metrics Breakdown */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <div className="p-3 rounded-xl bg-cosmic-900/80 border border-gold-500/20 text-left">
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className="p-3 rounded-2xl bg-cosmic-900/80 border border-gold-500/20 text-left shadow-inner">
                 <span className="block text-[11px] text-amber-400/70 font-cinzel uppercase">
                   Distance Dashed
                 </span>
@@ -796,25 +990,25 @@ export default function GameArena({ onNavigate }) {
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-cosmic-900/80 border border-gold-500/20 text-left">
+              <div className="p-3 rounded-2xl bg-cosmic-900/80 border border-gold-500/20 text-left shadow-inner">
                 <span className="block text-[11px] text-amber-400/70 font-cinzel uppercase">
                   Modaks Gathered
                 </span>
                 <span className="text-lg font-bold text-marigold font-mono">
-                  {modaksCollected}
+                  {modaksCollected} 🥮
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-cosmic-900/80 border border-gold-500/20 text-left">
+              <div className="p-3 rounded-2xl bg-cosmic-900/80 border border-gold-500/20 text-left shadow-inner">
                 <span className="block text-[11px] text-amber-400/70 font-cinzel uppercase">
-                  Fouls Cleared (Revives)
+                  Divine Revives
                 </span>
                 <span className="text-lg font-bold text-emerald-400 font-mono">
                   {revivesCount} Extra Lives
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-cosmic-900/80 border border-gold-500/20 text-left">
+              <div className="p-3 rounded-2xl bg-cosmic-900/80 border border-gold-500/20 text-left shadow-inner">
                 <span className="block text-[11px] text-amber-400/70 font-cinzel uppercase">
                   Final Run Score
                 </span>
@@ -824,35 +1018,44 @@ export default function GameArena({ onNavigate }) {
               </div>
             </div>
 
-            {/* Anti-Cheat Verification Feedback */}
+            {/* Anti-Cheat & Supabase Sync Status Feedback */}
             {isSubmitting ? (
-              <div className="p-3 rounded-xl bg-cosmic-900/60 border border-gold-500/30 flex items-center justify-center gap-2 text-xs text-amber-300 mb-6">
+              <div className="p-3.5 rounded-2xl bg-cosmic-900/60 border border-gold-500/30 flex items-center justify-center gap-2 text-xs text-amber-300 mb-5">
                 <div className="w-4 h-4 rounded-full border-2 border-gold-400 border-t-transparent animate-spin" />
-                <span>Verifying runner telemetry via Celestial Anti-Cheat...</span>
+                <span>Verifying runner telemetry & syncing to Supabase Cloud...</span>
               </div>
             ) : submissionResult ? (
               <div
-                className={`p-3.5 rounded-xl border mb-6 text-xs text-left ${
+                className={`p-3.5 rounded-2xl border mb-5 text-xs text-left ${
                   submissionResult.success
                     ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
                     : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
                 }`}
               >
-                <div className="flex items-center gap-2 font-bold mb-1">
-                  {submissionResult.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <div className="flex items-center justify-between font-bold mb-1">
+                  <div className="flex items-center gap-2">
+                    {submissionResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    )}
+                    <span>
+                      {submissionResult.success
+                        ? `Official Score: ${submissionResult.authoritativeScore} (${submissionResult.wisdom_rank})`
+                        : `Anti-Cheat Flag: ${submissionResult.reason}`}
+                    </span>
+                  </div>
+
+                  {submissionResult.success && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-900/60 border border-emerald-400/40 text-[10px] text-emerald-300 font-mono flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      <span>Supabase Synced</span>
+                    </span>
                   )}
-                  <span>
-                    {submissionResult.success
-                      ? `Authoritative Score: ${submissionResult.authoritativeScore} (${submissionResult.wisdom_rank})`
-                      : `Anti-Cheat Flag: ${submissionResult.reason}`}
-                  </span>
                 </div>
-                <p className="opacity-80">
+                <p className="opacity-80 leading-relaxed">
                   {submissionResult.success
-                    ? 'Cryptographic HMAC signature validated. Your official contest rank has been permanently etched on the leaderboard.'
+                    ? 'Cryptographic HMAC signature verified. Your score and stats have been permanently etched into the Supabase database.'
                     : submissionResult.details || submissionResult.message}
                 </p>
               </div>
@@ -862,16 +1065,24 @@ export default function GameArena({ onNavigate }) {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => onNavigate('/leaderboard')}
-                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 text-cosmic-950 font-bold font-cinzel text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-saffron-600/30 hover:brightness-110 active:scale-95 transition-all"
+                className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 text-cosmic-950 font-bold font-cinzel text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-saffron-600/30 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
-                View Contest Leaderboard
+                View Live Leaderboard
+              </button>
+
+              <button
+                onClick={handleCopyShareCard}
+                className="py-3 px-4 rounded-2xl border border-gold-500/40 hover:bg-white/5 text-amber-200 text-xs sm:text-sm font-cinzel transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {copiedShare ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedShare ? 'Copied to Clipboard!' : 'Share Score'}</span>
               </button>
 
               <button
                 onClick={startRun}
-                className="py-3 px-4 rounded-xl border border-gold-500/30 hover:bg-white/5 text-amber-200 text-xs sm:text-sm font-cinzel transition-colors flex items-center justify-center gap-1.5"
+                className="py-3 px-4 rounded-2xl border border-gold-500/40 bg-saffron-950/40 hover:bg-saffron-900/50 text-amber-200 text-xs sm:text-sm font-cinzel transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Repeat className="w-4 h-4" />
+                <Repeat className="w-4 h-4 text-marigold" />
                 <span>Dash Again</span>
               </button>
             </div>
