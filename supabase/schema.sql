@@ -1,7 +1,7 @@
 -- =========================================================================================
 -- "CELESTIAL DASH: MOOSHAK'S QUEST" (SECURE MULTIPLAYER RUNNER EDITION)
--- Production PostgreSQL Database Schema & Row Level Security Policies
--- Clean, human-readable, and comprehensive database structure for Supabase
+-- Production PostgreSQL Database Schema & Migration Script
+-- Safe to run on fresh or existing databases (uses ALTER ... ADD COLUMN IF NOT EXISTS)
 -- =========================================================================================
 
 -- 1. Enable Required Extensions
@@ -16,16 +16,18 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   username TEXT UNIQUE NOT NULL,
   email TEXT NOT NULL,
   avatar_url TEXT,
-  avatar_aspect TEXT DEFAULT 'Golden Mooshak' NOT NULL, -- 'Golden Mooshak', 'Bal Ganesha', 'Mayura Runner', 'Vighnaharta'
   wisdom_rank TEXT DEFAULT 'Celestial Seeker' NOT NULL,
-  highest_score INT DEFAULT 0 NOT NULL,
-  best_distance_meters NUMERIC(10, 2) DEFAULT 0.00 NOT NULL,
-  total_modaks_collected INT DEFAULT 0 NOT NULL,
-  total_races_completed INT DEFAULT 0 NOT NULL,
-  unlocked_achievements TEXT[] DEFAULT ARRAY['Initiate of Kailash', 'First Dash']::TEXT[] NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Upgrade existing profiles table with enhanced columns if they do not exist
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_aspect TEXT DEFAULT 'Golden Mooshak' NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS highest_score INT DEFAULT 0 NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS best_distance_meters NUMERIC(10, 2) DEFAULT 0.00 NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_modaks_collected INT DEFAULT 0 NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_races_completed INT DEFAULT 0 NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS unlocked_achievements TEXT[] DEFAULT ARRAY['Initiate of Kailash', 'First Dash']::TEXT[] NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL;
 
 -- Comments for database readability
 COMMENT ON TABLE public.profiles IS 'Human-readable player personas with aggregated stats, chosen avatar, and achievements';
@@ -38,17 +40,19 @@ COMMENT ON COLUMN public.profiles.wisdom_rank IS 'Earned mythological rank based
 CREATE TABLE IF NOT EXISTS public.game_sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  player_name TEXT DEFAULT 'Celestial Seeker' NOT NULL, -- Human-readable snapshot of player name
-  distance_traveled NUMERIC(10, 2) NOT NULL,           -- Total distance dashed in meters
-  modaks_collected INT NOT NULL DEFAULT 0,              -- Sweet golden Modaks collected during run
-  duration_seconds NUMERIC(8, 2) NOT NULL,              -- Run duration in seconds
-  final_score INT NOT NULL,                             -- Authoritative anti-cheat validated score
-  wisdom_rank TEXT DEFAULT 'Celestial Seeker' NOT NULL, -- Rank earned in this run
-  revives_used INT NOT NULL DEFAULT 0,                  -- Gemini AI trivia gates passed
-  anti_cheat_verified BOOLEAN DEFAULT true NOT NULL,    -- Passed HMAC & kinematic validation
-  hash_signature TEXT NOT NULL,                         -- Cryptographic HMAC-SHA256 signature
+  distance_traveled NUMERIC(10, 2) NOT NULL,
+  modaks_collected INT NOT NULL DEFAULT 0,
+  duration_seconds NUMERIC(8, 2) NOT NULL,
+  final_score INT NOT NULL,
+  hash_signature TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Upgrade existing game_sessions table with enhanced columns
+ALTER TABLE public.game_sessions ADD COLUMN IF NOT EXISTS player_name TEXT DEFAULT 'Celestial Seeker' NOT NULL;
+ALTER TABLE public.game_sessions ADD COLUMN IF NOT EXISTS wisdom_rank TEXT DEFAULT 'Celestial Seeker' NOT NULL;
+ALTER TABLE public.game_sessions ADD COLUMN IF NOT EXISTS revives_used INT NOT NULL DEFAULT 0;
+ALTER TABLE public.game_sessions ADD COLUMN IF NOT EXISTS anti_cheat_verified BOOLEAN DEFAULT true NOT NULL;
 
 COMMENT ON TABLE public.game_sessions IS 'Authoritative individual runs verified by Celestial Anti-Cheat Telemetry';
 COMMENT ON COLUMN public.game_sessions.player_name IS 'Cached username at time of run for easy human readability';
@@ -61,7 +65,7 @@ CREATE TABLE IF NOT EXISTS public.user_actions (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   player_name TEXT DEFAULT 'Celestial Seeker' NOT NULL,
   action_type TEXT NOT NULL, -- 'GAME_START', 'MODAK_MILESTONE', 'DIVINE_GATE_SOLVED', 'ACHIEVEMENT_UNLOCKED', 'AVATAR_CHANGED', 'GAME_COMPLETED'
-  action_description TEXT NOT NULL, -- Clear, human-readable description of what took place
+  action_description TEXT NOT NULL,
   metadata JSONB DEFAULT '{}'::JSONB NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
@@ -69,9 +73,11 @@ CREATE TABLE IF NOT EXISTS public.user_actions (
 COMMENT ON TABLE public.user_actions IS 'Audit log of active game milestones, AI trivia resolutions, and player choices';
 
 -- =========================================================================================
--- 5. Contest Leaderboard View (Human-Readable Global Rankings)
+-- 5. Contest Leaderboard View (Drop and recreate to support column modifications)
 -- =========================================================================================
-CREATE OR REPLACE VIEW public.leaderboard AS
+DROP VIEW IF EXISTS public.leaderboard CASCADE;
+
+CREATE VIEW public.leaderboard AS
 SELECT 
   p.id as user_id,
   p.username,
@@ -176,9 +182,12 @@ CREATE POLICY "Users can insert own actions."
 -- =========================================================================================
 -- 8. Supabase Realtime Publication Configuration
 -- =========================================================================================
-BEGIN;
-  DROP PUBLICATION IF EXISTS supabase_realtime;
-  CREATE PUBLICATION supabase_realtime;
-COMMIT;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END $$;
+
 ALTER PUBLICATION supabase_realtime ADD TABLE public.game_sessions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.user_actions;
