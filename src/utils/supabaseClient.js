@@ -23,8 +23,9 @@ export const supabase = isLiveSupabaseConfigured
 // Verified fallback guest UUID registered in Supabase
 export const CELESTIAL_GUEST_UUID = '75305c97-42f8-4686-a591-33e055b62e3b';
 
-// Local auth storage helper
+// Local storage keys
 const LOCAL_USER_KEY = 'celestial_ganesha_auth_user';
+const TRIAL_COMPLETED_KEY = 'celestial_trial_completed';
 
 export const localAuth = {
   getUser: () => {
@@ -50,6 +51,18 @@ export const localAuth = {
       localStorage.removeItem(LOCAL_USER_KEY);
       sessionStorage.removeItem(LOCAL_USER_KEY);
     } catch (e) {}
+  },
+  // Check if current user is an authenticated account (not guest)
+  isAuthenticated: () => {
+    const u = localAuth.getUser();
+    return Boolean(u && u.provider !== 'guest' && u.email && !u.email.includes('guest@'));
+  },
+  // Trial tracking for unauthenticated guest matches
+  isTrialCompleted: () => {
+    return localStorage.getItem(TRIAL_COMPLETED_KEY) === 'true';
+  },
+  setTrialCompleted: () => {
+    localStorage.setItem(TRIAL_COMPLETED_KEY, 'true');
   }
 };
 
@@ -66,6 +79,7 @@ export async function syncUserProfile(user) {
       email: user.email || 'seeker@kailash.io',
       avatar_url: user.avatar_url || null,
       wisdom_rank: user.wisdom_rank || 'Celestial Seeker',
+      updated_at: new Date().toISOString()
     };
 
     const { data, error } = await supabase
@@ -82,6 +96,80 @@ export async function syncUserProfile(user) {
     console.warn('Profile sync exception:', err);
     return null;
   }
+}
+
+/**
+ * Updates custom display name in Supabase and local session
+ */
+export async function updateCustomDisplayName(userId, newName) {
+  if (!newName || newName.trim().length < 2) {
+    return { success: false, message: 'Name must have at least 2 characters.' };
+  }
+
+  const cleanName = newName.trim().slice(0, 32);
+
+  try {
+    // 1. Update via server endpoint
+    const res = await fetch('/api/profile/update-username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, username: cleanName })
+    });
+    const data = await res.json();
+
+    // 2. Direct Supabase update if active
+    if (isLiveSupabaseConfigured && supabase && userId) {
+      await supabase
+        .from('profiles')
+        .update({ username: cleanName, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+    }
+
+    // 3. Update local session
+    const current = localAuth.getUser();
+    if (current) {
+      localAuth.setUser({ ...current, username: cleanName });
+    }
+
+    return { success: true, username: cleanName };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
+/**
+ * Unlocks a chronological lore level upon solving a riddle correctly
+ */
+export async function unlockLoreLevel(userId, loreLevel) {
+  try {
+    const res = await fetch('/api/profile/unlock-lore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, loreLevel })
+    });
+    return await res.json();
+  } catch (e) {
+    return { success: false };
+  }
+}
+
+/**
+ * Dispatches welcome sign-in email notification
+ */
+export async function notifyWelcomeSignIn(user) {
+  if (!user?.email) return;
+  try {
+    fetch('/api/notify/welcome-signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user.email,
+        username: user.username || 'Celestial Seeker',
+        provider: user.provider || 'google',
+        user_id: user.id
+      })
+    }).catch(() => {});
+  } catch (e) {}
 }
 
 /**
@@ -105,7 +193,6 @@ export async function logUserAction(actionType, actionDescription, metadata = {}
     if (isLiveSupabaseConfigured && supabase) {
       supabase.from('user_actions').insert(payload).then(({ error }) => {
         if (error) {
-          // Fallback to server endpoint
           fetch('/api/actions/log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

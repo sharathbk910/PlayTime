@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, ShieldCheck, Sparkles, AlertCircle, ArrowRight, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
-import { supabase, isLiveSupabaseConfigured, localAuth, syncUserProfile, logUserAction, CELESTIAL_GUEST_UUID } from '../utils/supabaseClient';
+import { supabase, isLiveSupabaseConfigured, localAuth, syncUserProfile, logUserAction, notifyWelcomeSignIn, CELESTIAL_GUEST_UUID } from '../utils/supabaseClient';
 import { audioEngine } from '../utils/audioEngine';
 
 export default function AuthPage({ onNavigate }) {
@@ -80,9 +80,10 @@ export default function AuthPage({ onNavigate }) {
             };
             localAuth.setUser(userObj, rememberMe);
             await syncUserProfile(userObj);
+            notifyWelcomeSignIn(userObj);
             logUserAction('SIGN_UP', `User registered persona: ${userObj.username}`, { email: userObj.email });
             audioEngine.playDivineWisdomChime();
-            setSuccessMsg('Account created successfully! Entering Celestial Realm...');
+            setSuccessMsg('Account created successfully! Confirmation dispatched. Entering Celestial Realm...');
             setTimeout(() => onNavigate('/play'), 800);
           }
         } else {
@@ -100,6 +101,7 @@ export default function AuthPage({ onNavigate }) {
             };
             localAuth.setUser(userObj, rememberMe);
             await syncUserProfile(userObj);
+            notifyWelcomeSignIn(userObj);
             logUserAction('SIGN_IN', `Devotee logged in: ${userObj.username}`);
             audioEngine.playDivineWisdomChime();
             setSuccessMsg('Welcome back, devotee! Entering Celestial Realm...');

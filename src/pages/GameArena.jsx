@@ -21,7 +21,9 @@ import {
   Copy,
   Check,
   Flame,
-  CloudCheck
+  CloudCheck,
+  Lock,
+  LogIn
 } from 'lucide-react';
 import GameViewport from '../components/GameViewport';
 import { TRACK_LANES } from '../utils/constants';
@@ -29,7 +31,7 @@ import RiddleModal from '../components/RiddleModal';
 import { useMultiplayer } from '../hooks/useMultiplayer';
 import { RunnerTelemetryTracker } from '../utils/antiCheatClient';
 import { audioEngine } from '../utils/audioEngine';
-import { localAuth, supabase, isLiveSupabaseConfigured, logUserAction, CELESTIAL_GUEST_UUID } from '../utils/supabaseClient';
+import { localAuth, supabase, isLiveSupabaseConfigured, logUserAction, unlockLoreLevel, CELESTIAL_GUEST_UUID } from '../utils/supabaseClient';
 
 export default function GameArena({ onNavigate }) {
   // Player state & Auth
@@ -37,6 +39,12 @@ export default function GameArena({ onNavigate }) {
     id: CELESTIAL_GUEST_UUID,
     username: 'Celestial Seeker'
   });
+
+  // Guest Trial Lock & Lore Level State
+  const [isTrialLocked, setIsTrialLocked] = useState(() => {
+    return !localAuth.isAuthenticated() && localAuth.isTrialCompleted();
+  });
+  const [loreLevel, setLoreLevel] = useState(() => currentUser?.wisdom_level || 1);
 
   // Runner Coordinates & Physics State
   const [currentLane, setCurrentLane] = useState(1); // 0 = Left (+2.5), 1 = Center (0), 2 = Right (-2.5)
@@ -124,8 +132,10 @@ export default function GameArena({ onNavigate }) {
         if (data?.user) {
           setCurrentUser({
             id: data.user.id,
-            username: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Seeker'
+            username: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Seeker',
+            email: data.user.email
           });
+          setIsTrialLocked(false);
         }
       });
     }
@@ -194,6 +204,11 @@ export default function GameArena({ onNavigate }) {
 
   // Initialize or Restart Runner Dash with 3-2-1 Countdown
   const startRun = useCallback(() => {
+    if (!localAuth.isAuthenticated() && localAuth.isTrialCompleted()) {
+      setIsTrialLocked(true);
+      return;
+    }
+
     setCurrentLane(1);
     currentLaneRef.current = 1;
     playerZRef.current = 0;
@@ -278,6 +293,10 @@ export default function GameArena({ onNavigate }) {
   }, [currentUser.id, generateTrackSegment]);
 
   useEffect(() => {
+    if (!localAuth.isAuthenticated() && localAuth.isTrialCompleted()) {
+      setIsTrialLocked(true);
+      return;
+    }
     startRun();
   }, [startRun]);
 
@@ -618,6 +637,14 @@ export default function GameArena({ onNavigate }) {
       setRevivesCount((r) => r + 1);
       setMultiplier((m) => m + 1);
 
+      // Advance mythological lore level in DB & local progression
+      unlockLoreLevel(currentUser.id, loreLevel).then((res) => {
+        if (res?.unlockedLevel) {
+          setLoreLevel((prev) => Math.min(10, Math.max(prev, res.unlockedLevel + 1)));
+        }
+      }).catch(() => {});
+      setLoreLevel((prev) => Math.min(prev + 1, 10));
+
       // Advance slightly past obstacle
       playerZRef.current += 3.5;
       setPlayerZ(playerZRef.current);
@@ -648,6 +675,10 @@ export default function GameArena({ onNavigate }) {
     setRunFinished(true);
     runFinishedRef.current = true;
     setIsSubmitting(true);
+
+    if (!localAuth.isAuthenticated()) {
+      localAuth.setTrialCompleted();
+    }
 
     audioEngine.playShankhaBlast();
     confetti({
@@ -747,6 +778,16 @@ export default function GameArena({ onNavigate }) {
               {modaksCollected}
             </span>
           </div>
+
+          {/* Guest Trial Badge */}
+          {!localAuth.isAuthenticated() && (
+            <div className="temple-glass rounded-2xl px-3 py-1.5 border border-marigold/50 bg-amber-950/70 flex items-center gap-1.5 shadow-lg animate-pulse">
+              <span className="text-xs">⚡</span>
+              <span className="text-xs font-bold text-amber-200 font-cinzel">
+                Free Trial Dash (1/1)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Center HUD: Dynamic Score & Combo */}
@@ -949,6 +990,7 @@ export default function GameArena({ onNavigate }) {
         isOpen={isDivineGateOpen}
         foulMessage={foulMessage}
         distance={distanceTraveled}
+        loreLevel={loreLevel}
         onClose={() => {
           setIsDivineGateOpen(false);
           isDivineGateOpenRef.current = false;
@@ -1018,6 +1060,26 @@ export default function GameArena({ onNavigate }) {
               </div>
             </div>
 
+            {/* Guest Trial Completion Alert */}
+            {!localAuth.isAuthenticated() && (
+              <div className="p-4 rounded-2xl bg-saffron-950/80 border-2 border-gold-400 text-left mb-5 shadow-xl">
+                <div className="flex items-center gap-2 text-amber-200 font-bold font-cinzel text-sm mb-1">
+                  <Lock className="w-4 h-4 text-marigold" />
+                  <span>Complimentary Free Trial Dash Concluded</span>
+                </div>
+                <p className="text-xs text-amber-300/80 font-cinzel leading-relaxed">
+                  You've experienced Mount Kailash! Sign in with your Google account to unlock unlimited dashes, save your score to the official Supabase Leaderboard, and explore the 10 Sacred Ganesha Lore Chapters.
+                </p>
+                <button
+                  onClick={() => onNavigate('/auth')}
+                  className="mt-3 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 text-cosmic-950 font-bold font-cinzel text-xs uppercase tracking-wider shadow-md hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Sign In to Unlock Unlimited Dashing</span>
+                </button>
+              </div>
+            )}
+
             {/* Anti-Cheat & Supabase Sync Status Feedback */}
             {isSubmitting ? (
               <div className="p-3.5 rounded-2xl bg-cosmic-900/60 border border-gold-500/30 flex items-center justify-center gap-2 text-xs text-amber-300 mb-5">
@@ -1079,11 +1141,72 @@ export default function GameArena({ onNavigate }) {
               </button>
 
               <button
-                onClick={startRun}
+                onClick={() => {
+                  if (!localAuth.isAuthenticated() && localAuth.isTrialCompleted()) {
+                    setIsTrialLocked(true);
+                  } else {
+                    startRun();
+                  }
+                }}
                 className="py-3 px-4 rounded-2xl border border-gold-500/40 bg-saffron-950/40 hover:bg-saffron-900/50 text-amber-200 text-xs sm:text-sm font-cinzel transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Repeat className="w-4 h-4 text-marigold" />
                 <span>Dash Again</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Guest Trial Lockout Modal */}
+      {isTrialLocked && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cosmic-950/92 backdrop-blur-md">
+          <div className="relative w-full max-w-md rounded-3xl temple-glass-gold border-2 border-gold-temple p-6 sm:p-8 text-center shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-saffron-950/80 border border-gold-400/50 mx-auto mb-4 flex items-center justify-center text-3xl shadow-lg">
+              🔒
+            </div>
+
+            <h3 className="text-2xl font-bold font-mythic text-amber-100 glow-text-gold">
+              Celestial Trial Concluded
+            </h3>
+            <p className="text-xs text-amber-300/90 font-cinzel mt-1 mb-5">
+              1 Free Trial Match Completed
+            </p>
+
+            <div className="p-4 rounded-2xl bg-cosmic-900/80 border border-gold-500/30 text-xs text-amber-200/90 font-cinzel text-left space-y-2 mb-6 shadow-inner">
+              <div className="flex items-center gap-2 font-bold text-amber-300">
+                <Sparkles className="w-4 h-4 text-marigold shrink-0" />
+                <span>Sign in to unlock full celestial privileges:</span>
+              </div>
+              <ul className="space-y-1.5 pl-6 list-disc text-amber-100/80 text-[11px]">
+                <li>Unlimited dashes across Mount Kailash lanes</li>
+                <li>Permanently sync scores to Supabase Leaderboard</li>
+                <li>Answer 10 Chronological Ganesha Lore Chapters</li>
+                <li>Customize your Devotee Display Name and Avatar</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2.5">
+              <button
+                onClick={() => onNavigate('/auth')}
+                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 text-cosmic-950 font-bold font-cinzel text-xs sm:text-sm uppercase tracking-wider shadow-xl shadow-saffron-600/30 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In with Google / Account</span>
+              </button>
+
+              <button
+                onClick={() => onNavigate('/leaderboard')}
+                className="w-full py-2.5 px-4 rounded-xl border border-gold-500/30 hover:bg-white/5 text-amber-200 text-xs font-cinzel transition-colors cursor-pointer"
+              >
+                View Live Leaderboard
+              </button>
+
+              <button
+                onClick={() => onNavigate('/dashboard')}
+                className="w-full py-2 px-4 rounded-xl text-amber-400/70 hover:text-amber-200 text-xs font-cinzel transition-colors cursor-pointer"
+              >
+                Explore Wisdom Codex & Lore
               </button>
             </div>
           </div>

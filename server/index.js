@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { getDivineTrivia, getCelestialRiddle } from './services/geminiService.js';
 import { validateGameSession } from './services/antiCheat.js';
+import { sendWelcomeEmailNotification } from './services/emailService.js';
 
 dotenv.config();
 
@@ -137,12 +138,12 @@ app.get('/api/health', (req, res) => {
  */
 app.post('/api/trivia/generate', triviaLimiter, async (req, res) => {
   try {
-    const { difficulty = 'medium' } = req.body;
-    const trivia = await getDivineTrivia(difficulty);
+    const { difficulty = 'medium', loreLevel = 1 } = req.body;
+    const trivia = await getDivineTrivia(difficulty, loreLevel);
     return res.json({
       success: true,
       trivia,
-      riddle: trivia // Compatibility with older client modals
+      riddle: trivia
     });
   } catch (error) {
     console.error('Error generating divine trivia:', error);
@@ -159,8 +160,8 @@ app.post('/api/trivia/generate', triviaLimiter, async (req, res) => {
  */
 app.post('/api/riddle/generate', triviaLimiter, async (req, res) => {
   try {
-    const { difficulty = 'medium' } = req.body;
-    const trivia = await getDivineTrivia(difficulty);
+    const { difficulty = 'medium', loreLevel = 1 } = req.body;
+    const trivia = await getDivineTrivia(difficulty, loreLevel);
     return res.json({
       success: true,
       riddle: trivia,
@@ -173,6 +174,121 @@ app.post('/api/riddle/generate', triviaLimiter, async (req, res) => {
       error: 'The Oracle is in cosmic meditation.',
       oracle_notice: 'Ancient scrolls have unsealed.'
     });
+  }
+});
+
+/**
+ * POST /api/notify/welcome-signin
+ * Dispatches welcome email notification upon user authentication
+ */
+app.post('/api/notify/welcome-signin', async (req, res) => {
+  try {
+    const { email, username = 'Celestial Seeker', provider = 'google' } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email address required' });
+    }
+
+    const result = await sendWelcomeEmailNotification({ email, username, provider });
+
+    // Audit log to user_actions if Supabase is connected
+    if (supabase) {
+      try {
+        const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+        const userId = req.body.user_id && isUuid(req.body.user_id) ? req.body.user_id : '75305c97-42f8-4686-a591-33e055b62e3b';
+        await supabase.from('user_actions').insert({
+          user_id: userId,
+          player_name: username,
+          action_type: 'WELCOME_EMAIL_SENT',
+          action_description: `Dispatched welcome sign-in notification to ${email} (${provider})`,
+          metadata: { email, provider, timestamp: new Date().toISOString() }
+        });
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, notification: result });
+  } catch (err) {
+    console.warn('Welcome notification note:', err.message);
+    return res.json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/profile/update-username
+ * Allows devotee to customize and persist their display name
+ */
+app.post('/api/profile/update-username', async (req, res) => {
+  try {
+    const { user_id, username } = req.body;
+    if (!username || username.trim().length < 2) {
+      return res.status(400).json({ success: false, message: 'Display name must have at least 2 characters.' });
+    }
+
+    const cleanName = username.trim().slice(0, 32);
+    const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    if (supabase && isUuid(user_id)) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ username: cleanName, updated_at: new Date().toISOString() })
+        .eq('id', user_id);
+
+      if (error) throw error;
+    }
+
+    return res.json({ success: true, username: cleanName });
+  } catch (err) {
+    console.error('Username update error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/profile/unlock-lore
+ * Progresses wisdom level and marks chapter unlocked in Supabase
+ */
+app.post('/api/profile/unlock-lore', async (req, res) => {
+  try {
+    const { user_id, loreLevel } = req.body;
+    const lvl = Math.max(1, Math.min(10, Number(loreLevel) || 1));
+    const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    if (supabase && isUuid(user_id)) {
+      try {
+        const { data: profile, error: selectErr } = await supabase
+          .from('profiles')
+          .select('cleared_lore_levels, wisdom_level')
+          .eq('id', user_id)
+          .maybeSingle();
+
+        if (!selectErr && profile) {
+          const existingLevels = profile.cleared_lore_levels || [1];
+          const updatedLevels = Array.from(new Set([...existingLevels, lvl])).sort((a, b) => a - b);
+          const nextWisdom = Math.min(10, Math.max(profile.wisdom_level || 1, lvl + 1));
+
+          await supabase
+            .from('profiles')
+            .update({
+              cleared_lore_levels: updatedLevels,
+              wisdom_level: nextWisdom,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', user_id);
+        }
+      } catch (dbErr) {
+        console.warn('Unlock lore Supabase sync notice:', dbErr.message);
+      }
+    }
+
+    // Also update in-memory store
+    const mem = profileStore.get(user_id) || {};
+    const memExisting = mem.cleared_lore_levels || [1];
+    mem.cleared_lore_levels = Array.from(new Set([...memExisting, lvl])).sort((a, b) => a - b);
+    mem.wisdom_level = Math.min(10, Math.max(mem.wisdom_level || 1, lvl + 1));
+    profileStore.set(user_id, mem);
+
+    return res.json({ success: true, unlockedLevel: lvl, nextLevel: Math.min(10, lvl + 1) });
+  } catch (err) {
+    return res.json({ success: true, unlockedLevel: 1, message: err.message });
   }
 });
 
@@ -507,7 +623,9 @@ app.get('/api/profile/:id', async (req, res) => {
           best_distance: Number(dbProfile.best_distance_meters) || profile.best_distance,
           modaks_total: dbProfile.total_modaks_collected || profile.modaks_total,
           races_count: dbProfile.total_races_completed || profile.races_count,
-          avatar_aspect: dbProfile.avatar_aspect || 'Golden Mooshak'
+          avatar_aspect: dbProfile.avatar_aspect || 'Golden Mooshak',
+          wisdom_level: dbProfile.wisdom_level || profile.wisdom_level || 1,
+          cleared_lore_levels: dbProfile.cleared_lore_levels || profile.cleared_lore_levels || [1]
         };
       }
 

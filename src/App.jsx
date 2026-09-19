@@ -36,6 +36,13 @@ export default function App() {
           localAuth.setUser(syncedUser, true);
           await syncUserProfile(syncedUser);
 
+          // Dispatch welcome email notification
+          if (event === 'SIGNED_IN') {
+            import('./utils/supabaseClient.js').then(({ notifyWelcomeSignIn }) => {
+              notifyWelcomeSignIn(syncedUser);
+            });
+          }
+
           // Clean up OAuth tokens from URL if present
           if (window.location.hash && window.location.hash.includes('access_token')) {
             window.history.replaceState({}, document.title, window.location.pathname);

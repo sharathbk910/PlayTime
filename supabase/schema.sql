@@ -28,11 +28,15 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_modaks_collected INT 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_races_completed INT DEFAULT 0 NOT NULL;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS unlocked_achievements TEXT[] DEFAULT ARRAY['Initiate of Kailash', 'First Dash']::TEXT[] NOT NULL;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS wisdom_level INT DEFAULT 1 NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS cleared_lore_levels INT[] DEFAULT ARRAY[1]::INT[] NOT NULL;
 
 -- Comments for database readability
 COMMENT ON TABLE public.profiles IS 'Human-readable player personas with aggregated stats, chosen avatar, and achievements';
 COMMENT ON COLUMN public.profiles.avatar_aspect IS 'Chosen spiritual vahana aspect displayed across the celestial realm';
 COMMENT ON COLUMN public.profiles.wisdom_rank IS 'Earned mythological rank based on verified runner distance and score';
+COMMENT ON COLUMN public.profiles.wisdom_level IS 'Current unlocked lore & riddle chapter level (1 to 10)';
+COMMENT ON COLUMN public.profiles.cleared_lore_levels IS 'Array of completed chronological lore chapter IDs';
 
 -- =========================================================================================
 -- 3. Game Sessions Table (Authoritative Runner Attempts)

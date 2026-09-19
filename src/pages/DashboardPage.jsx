@@ -1,7 +1,119 @@
 import React, { useState, useEffect } from 'react';
-import { User, Trophy, Award, Gauge, Sparkles, ShieldCheck, Play, ArrowRight, Heart, CloudCheck, CheckCircle2, History } from 'lucide-react';
-import { localAuth, supabase, isLiveSupabaseConfigured, logUserAction, syncUserProfile, CELESTIAL_GUEST_UUID } from '../utils/supabaseClient';
+import {
+  User,
+  Trophy,
+  Award,
+  Gauge,
+  Sparkles,
+  ShieldCheck,
+  Play,
+  ArrowRight,
+  Heart,
+  CloudCheck,
+  CheckCircle2,
+  History,
+  Edit3,
+  Check,
+  X,
+  BookOpen,
+  Lock,
+  Unlock,
+  ChevronRight
+} from 'lucide-react';
+import {
+  localAuth,
+  supabase,
+  isLiveSupabaseConfigured,
+  logUserAction,
+  syncUserProfile,
+  updateCustomDisplayName,
+  CELESTIAL_GUEST_UUID
+} from '../utils/supabaseClient';
 import { audioEngine } from '../utils/audioEngine';
+
+// 10 Chronological Ganesha Lore Chapters
+const LORE_CHAPTERS = [
+  {
+    level: 1,
+    title: 'The Sacred Turmeric Creation',
+    summary: 'Before her holy bath on Mount Kailash, Goddess Parvati shaped a divine child from fragrant golden turmeric paste and infused Him with life to guard her inner sanctum.',
+    teaching: 'Symbolizes auspicious beginnings (Shubha), primal purity, and unshakeable filial love.',
+    blessing: '+200 Wisdom & Shield of Auspiciousness',
+    source: 'Shiva Purana'
+  },
+  {
+    level: 2,
+    title: 'The Guardian at the Door',
+    summary: 'Standing steadfast at the threshold, young Ganesha loyally barred even Lord Shiva from entering, upholding his mother’s sacred trust with absolute devotion.',
+    teaching: 'Teaches unwavering commitment to righteous duty (Dharma) and resolute fearlessness.',
+    blessing: '+220 Wisdom & Unshakeable Loyalty',
+    source: 'Ganesha Purana'
+  },
+  {
+    level: 3,
+    title: 'The Wrath of the Trishula',
+    summary: 'In an earth-shaking clash of cosmic wills, Lord Shiva’s divine trident severed young Ganesha’s head before his true identity was revealed.',
+    teaching: 'Represents the destruction of the mortal ego (Ahamkara), opening the soul to universal cosmic consciousness.',
+    blessing: '+240 Wisdom & Transcendence',
+    source: 'Shiva Purana'
+  },
+  {
+    level: 4,
+    title: 'The Quest Northward',
+    summary: 'Grief-stricken Parvati wept. Shiva commanded his Ganas to journey North and bring back the head of the first living being found sleeping facing North.',
+    teaching: 'North represents the magnetic pole of Mount Kailash and spiritual enlightenment.',
+    blessing: '+260 Wisdom & Divine Compass',
+    source: 'Mudgala Purana'
+  },
+  {
+    level: 5,
+    title: 'Rebirth as Gajanana',
+    summary: 'A noble celestial elephant peacefully offered its head in devotion. Shiva joined it with the boy, breathing eternal cosmic life into Gajanana.',
+    teaching: 'The elephant head signifies supreme intellect (Buddhi), profound memory, and the power to uproot life’s heaviest obstacles.',
+    blessing: '+280 Wisdom & Elephant Fortitude',
+    source: 'Brahma Vaivarta Purana'
+  },
+  {
+    level: 6,
+    title: 'Coronation as Ganapati & Vighnaharta',
+    summary: 'The Devas celebrated His resurgence. Shiva bestowed the boon that Ganesha must be worshipped first before any new endeavor begins.',
+    teaching: 'Acknowledges Ganesha as Prathama-Pujya, who clears impediments from all spiritual and worldly endeavors.',
+    blessing: '+300 Wisdom & Obstacle Cleared',
+    source: 'Ganesha Sahasranama'
+  },
+  {
+    level: 7,
+    title: 'The Great Cosmic Race',
+    summary: 'When challenged to race around the universe against Kartikeya, Ganesha simply walked three times around his parents Shiva and Parvati.',
+    teaching: 'Proves that devoted love and honoring one’s parents encompasses the entire living cosmos.',
+    blessing: '+320 Wisdom & Fruit of Jnana',
+    source: 'Skanda Purana'
+  },
+  {
+    level: 8,
+    title: 'Taming Krauncha into Mooshak',
+    summary: 'When the giant demon mouse Krauncha wreaked havoc across hermitages, Ganesha reined in his pride with a golden noose, accepting him as his loyal vahana.',
+    teaching: 'Shows divine wisdom taming restless worldly desires (symbolized by the burrowing mouse).',
+    blessing: '+350 Wisdom & Mastery of Senses',
+    source: 'Mudgala Purana'
+  },
+  {
+    level: 9,
+    title: 'The Broken Tusk & The Mahabharata',
+    summary: 'When Sage Vyasa recited the Mahabharata without pause, Ganesha snapped off his own right tusk to continue writing without interruption.',
+    teaching: 'Teaches that personal comfort must be sacrificed in the pursuit of eternal knowledge (Ekadanta).',
+    blessing: '+380 Wisdom & Ekadanta Blessing',
+    source: 'Mahabharata Adi Parva'
+  },
+  {
+    level: 10,
+    title: 'The Golden Modaka & Supreme Bliss',
+    summary: 'In His hand, Ganesha holds the sacred Modaka: a humble outer dough shell concealing a golden sweet core of jaggery and coconut.',
+    teaching: 'The outer shell represents the mortal vessel, while the sweet center represents Atma-Ananda (eternal spiritual bliss).',
+    blessing: '+400 Wisdom & Supreme Enlightenment',
+    source: 'Vedic Symbolism'
+  }
+];
 
 export default function DashboardPage({ onNavigate }) {
   const [currentUser, setCurrentUser] = useState(() => localAuth.getUser() || {
@@ -9,6 +121,23 @@ export default function DashboardPage({ onNavigate }) {
     username: 'Celestial Seeker',
     email: 'seeker@kailash.io'
   });
+
+  // Custom Display Name Editing State
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameInput, setEditNameInput] = useState('');
+  const [nameSaveStatus, setNameSaveStatus] = useState(null); // 'saving' | 'saved' | 'error'
+  const [nameSaveMessage, setNameSaveMessage] = useState('');
+
+  // Codex & Lore Progression State
+  const [clearedLoreLevels, setClearedLoreLevels] = useState(() => {
+    try {
+      const saved = localStorage.getItem('celestial_cleared_lore');
+      return saved ? JSON.parse(saved) : [1];
+    } catch (e) {
+      return [1];
+    }
+  });
+  const [activeCodexChapter, setActiveCodexChapter] = useState(null);
 
   const [stats, setStats] = useState({
     total_score: 0,
@@ -89,6 +218,12 @@ export default function DashboardPage({ onNavigate }) {
           if (data.profile.avatar_aspect) {
             setSelectedAvatar(data.profile.avatar_aspect);
           }
+          if (data.profile.cleared_lore_levels && Array.isArray(data.profile.cleared_lore_levels)) {
+            setClearedLoreLevels(data.profile.cleared_lore_levels);
+            try {
+              localStorage.setItem('celestial_cleared_lore', JSON.stringify(data.profile.cleared_lore_levels));
+            } catch (e) {}
+          }
         }
         if (data?.race_history) {
           setRaces(data.race_history);
@@ -96,6 +231,31 @@ export default function DashboardPage({ onNavigate }) {
       })
       .catch(err => console.warn('Profile fetch note:', err));
   }, [currentUser.id]);
+
+  const handleSaveName = async (e) => {
+    if (e) e.preventDefault();
+    const clean = editNameInput.trim();
+    if (!clean || clean.length < 2) {
+      setNameSaveStatus('error');
+      setNameSaveMessage('Display name must have at least 2 characters.');
+      return;
+    }
+
+    setNameSaveStatus('saving');
+    const res = await updateCustomDisplayName(currentUser.id, clean);
+
+    if (res.success) {
+      setCurrentUser(prev => ({ ...prev, username: clean }));
+      setNameSaveStatus('saved');
+      setNameSaveMessage('Display name updated & synced to Supabase!');
+      setIsEditingName(false);
+      audioEngine.playTempleBell(660);
+      setTimeout(() => setNameSaveStatus(null), 3500);
+    } else {
+      setNameSaveStatus('error');
+      setNameSaveMessage(res.message || 'Failed to update name.');
+    }
+  };
 
   const handleSelectAvatar = async (av) => {
     setSelectedAvatar(av.id);
@@ -150,9 +310,67 @@ export default function DashboardPage({ onNavigate }) {
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-bold font-mythic text-amber-100 glow-text-gold">
-              {currentUser.username}
-            </h1>
+            {/* Editable Custom Display Name */}
+            {isEditingName ? (
+              <form onSubmit={handleSaveName} className="flex flex-wrap items-center justify-center sm:justify-start gap-2 my-1">
+                <input
+                  type="text"
+                  value={editNameInput}
+                  onChange={(e) => setEditNameInput(e.target.value)}
+                  maxLength={32}
+                  placeholder="Enter devotee name..."
+                  className="px-3 py-1.5 rounded-xl bg-cosmic-950 border border-gold-400 text-amber-100 font-mythic text-xl focus:outline-none focus:ring-2 focus:ring-gold-400/50 shadow-inner"
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={nameSaveStatus === 'saving'}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-saffron-600 to-gold-400 text-cosmic-950 font-cinzel font-bold text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{nameSaveStatus === 'saving' ? 'Saving...' : 'Save'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingName(false);
+                    setEditNameInput(currentUser.username);
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-gold-500/30 text-amber-300 text-xs font-cinzel hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <div className="flex items-center justify-center sm:justify-start gap-2.5">
+                <h1 className="text-2xl sm:text-3xl font-bold font-mythic text-amber-100 glow-text-gold">
+                  {currentUser.username}
+                </h1>
+                <button
+                  onClick={() => {
+                    setEditNameInput(currentUser.username || '');
+                    setIsEditingName(true);
+                  }}
+                  title="Edit Custom Display Name"
+                  className="p-1.5 rounded-lg border border-gold-500/30 bg-cosmic-900/60 text-amber-300 hover:text-amber-100 hover:border-gold-400 transition-all cursor-pointer shadow"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {nameSaveStatus === 'saved' && (
+              <p className="text-xs text-emerald-300 font-cinzel mt-1 flex items-center justify-center sm:justify-start gap-1 animate-pulse">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{nameSaveMessage}</span>
+              </p>
+            )}
+            {nameSaveStatus === 'error' && (
+              <p className="text-xs text-rose-300 font-cinzel mt-1">
+                {nameSaveMessage}
+              </p>
+            )}
+
             <p className="text-xs text-amber-300/70 font-cinzel mt-0.5">
               Contestant Email: <span className="text-amber-200">{currentUser.email}</span>
             </p>
@@ -255,6 +473,120 @@ export default function DashboardPage({ onNavigate }) {
 
       </div>
 
+      {/* Ganesha Lore & Wisdom Codex Section */}
+      <div className="rounded-3xl temple-glass border border-gold-500/30 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+        {/* Ambient background glow */}
+        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gradient-to-br from-saffron-500/10 to-gold-400/5 blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 relative z-10">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-3 py-0.5 rounded-full text-xs font-cinzel font-semibold bg-saffron-950/80 border border-gold-500/40 text-amber-300 flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-marigold" />
+                <span>Mythological Knowledge Vault</span>
+              </span>
+              <span className="text-xs font-mono text-amber-400/70">
+                10 Sacred Chapters
+              </span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold font-mythic text-amber-100 glow-text-gold">
+              Ganesha Lore & Wisdom Codex
+            </h3>
+            <p className="text-xs text-amber-300/70 font-cinzel mt-1">
+              Chronologically explore Lord Ganesha's life by solving Gemini AI Divine Gate riddles in the arena.
+            </p>
+          </div>
+
+          {/* Lore Progress & Mastery Bar */}
+          <div className="temple-glass rounded-2xl p-4 border border-gold-500/20 bg-cosmic-950/70 min-w-[240px]">
+            <div className="flex justify-between text-xs font-cinzel mb-1.5">
+              <span className="text-amber-300/80">Codex Mastery:</span>
+              <span className="font-bold text-amber-100 font-mono">
+                {clearedLoreLevels.length} / 10 Chapters ({Math.min(100, Math.round((clearedLoreLevels.length / 10) * 100))}%)
+              </span>
+            </div>
+            <div className="w-full h-2.5 rounded-full bg-cosmic-900 border border-gold-500/30 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 shadow-md shadow-saffron-500/50 transition-all duration-500"
+                style={{ width: `${Math.min(100, (clearedLoreLevels.length / 10) * 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 10 Chapters Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+          {LORE_CHAPTERS.map((ch) => {
+            const isUnlocked = clearedLoreLevels.includes(ch.level) || ch.level === 1;
+
+            return (
+              <div
+                key={ch.level}
+                onClick={() => {
+                  if (isUnlocked) {
+                    setActiveCodexChapter(ch);
+                    audioEngine.playTempleBell(528);
+                  }
+                }}
+                className={`rounded-2xl p-4 border transition-all relative overflow-hidden ${
+                  isUnlocked
+                    ? 'border-gold-500/40 bg-cosmic-900/70 hover:border-gold-400 hover:bg-saffron-950/40 cursor-pointer shadow-md hover:shadow-xl hover:shadow-saffron-600/20'
+                    : 'border-gold-500/10 bg-cosmic-950/40 opacity-50 cursor-not-allowed'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold font-mono border ${
+                      isUnlocked
+                        ? 'bg-gradient-to-tr from-saffron-600 to-gold-400 text-cosmic-950 border-gold-300 shadow'
+                        : 'bg-cosmic-950 text-amber-400/40 border-gold-500/20'
+                    }`}>
+                      {ch.level}
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-cinzel font-semibold uppercase tracking-wider text-amber-400/70">
+                        Chapter {ch.level}
+                      </span>
+                      <h4 className="font-bold text-sm text-amber-100 font-cinzel line-clamp-1">
+                        {ch.title}
+                      </h4>
+                    </div>
+                  </div>
+
+                  {isUnlocked ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 flex items-center gap-1 shrink-0">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      <span>Unlocked</span>
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-cosmic-950 border border-gold-500/20 text-amber-400/50 flex items-center gap-1 shrink-0">
+                      <Lock className="w-2.5 h-2.5" />
+                      <span>Sealed</span>
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-amber-200/80 font-cinzel line-clamp-2 leading-relaxed mb-3">
+                  {isUnlocked ? ch.summary : `Solve Divine Gate Riddle Level ${ch.level} in the arena to unseal this sacred chapter.`}
+                </p>
+
+                {isUnlocked && (
+                  <div className="flex items-center justify-between pt-2 border-t border-gold-500/15 text-[11px]">
+                    <span className="text-marigold font-cinzel font-semibold">
+                      {ch.blessing}
+                    </span>
+                    <span className="text-amber-400/60 font-mono text-[10px] flex items-center gap-1">
+                      <span>{ch.source}</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Recent Race History (Direct from Supabase) */}
       <div className="rounded-3xl temple-glass border border-gold-500/30 p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
@@ -339,6 +671,62 @@ export default function DashboardPage({ onNavigate }) {
           })}
         </div>
       </div>
+
+      {/* Interactive Chapter Reader Modal */}
+      {activeCodexChapter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cosmic-950/85 backdrop-blur-md">
+          <div className="relative w-full max-w-lg rounded-3xl temple-glass-gold border-2 border-gold-temple p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-gold-500/20 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-saffron-950/80 border border-gold-400 text-amber-300 text-xs font-mono font-bold">
+                  Chapter {activeCodexChapter.level}
+                </span>
+                <span className="text-xs text-amber-400/70 font-mono">
+                  {activeCodexChapter.source}
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveCodexChapter(null)}
+                className="p-1.5 rounded-xl border border-gold-500/30 text-amber-300 hover:text-amber-100 hover:bg-white/5 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <h3 className="text-2xl font-bold font-mythic text-amber-100 glow-text-gold mb-3">
+              {activeCodexChapter.title}
+            </h3>
+
+            <div className="space-y-4 text-xs font-cinzel text-amber-200/90 leading-relaxed mb-6">
+              <div className="p-4 rounded-2xl bg-cosmic-950/70 border border-gold-500/20 shadow-inner">
+                <span className="block text-[10px] uppercase font-bold text-amber-400/70 mb-1">
+                  Sacred Mythological Story
+                </span>
+                <p className="text-amber-100">{activeCodexChapter.summary}</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-saffron-950/40 border border-gold-400/30 shadow-inner">
+                <span className="block text-[10px] uppercase font-bold text-marigold mb-1">
+                  Spiritual Teaching & Philosophy
+                </span>
+                <p className="text-amber-200">{activeCodexChapter.teaching}</p>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs">
+                <span className="font-semibold">Divine Blessing:</span>
+                <span className="font-bold font-mono">{activeCodexChapter.blessing}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveCodexChapter(null)}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 text-cosmic-950 font-cinzel font-bold text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+            >
+              Close Chapter Codex
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
