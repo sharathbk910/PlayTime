@@ -13,12 +13,15 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- =========================================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  username TEXT UNIQUE NOT NULL,
+  username TEXT NOT NULL,
   email TEXT NOT NULL,
   avatar_url TEXT,
   wisdom_rank TEXT DEFAULT 'Celestial Seeker' NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Drop unique constraint on username if it exists from previous schema iterations to allow flexible display names
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_username_key;
 
 -- Upgrade existing profiles table with enhanced columns if they do not exist
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_aspect TEXT DEFAULT 'Golden Mooshak' NOT NULL;

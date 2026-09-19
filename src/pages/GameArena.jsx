@@ -1068,14 +1068,14 @@ export default function GameArena({ onNavigate }) {
                   <span>Complimentary Free Trial Dash Concluded</span>
                 </div>
                 <p className="text-xs text-amber-300/80 font-cinzel leading-relaxed">
-                  You've experienced Mount Kailash! Sign in with your Google account to unlock unlimited dashes, save your score to the official Supabase Leaderboard, and explore the 10 Sacred Ganesha Lore Chapters.
+                  You've experienced Mount Kailash! Sign in with your Email ID to unlock unlimited dashes, save your score to the official Supabase Leaderboard, and explore the 10 Sacred Ganesha Lore Chapters.
                 </p>
                 <button
                   onClick={() => onNavigate('/auth')}
                   className="mt-3 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 text-cosmic-950 font-bold font-cinzel text-xs uppercase tracking-wider shadow-md hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>Sign In to Unlock Unlimited Dashing</span>
+                  <span>Sign In with Email to Unlock Unlimited Dashing</span>
                 </button>
               </div>
             )}
@@ -1192,7 +1192,7 @@ export default function GameArena({ onNavigate }) {
                 className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-saffron-600 via-marigold to-gold-400 text-cosmic-950 font-bold font-cinzel text-xs sm:text-sm uppercase tracking-wider shadow-xl shadow-saffron-600/30 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Sign In with Google / Account</span>
+                <span>Sign In with Email ID</span>
               </button>
 
               <button

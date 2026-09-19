@@ -70,11 +70,8 @@ export default function Navbar({ currentRoute, onNavigate }) {
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="block text-[10px] uppercase tracking-widest text-amber-300/80 font-cinzel font-semibold">
-                Ganesh Chaturthi Contest
-              </span>
-              <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-emerald-950/60 border border-emerald-500/30 text-[9px] text-emerald-300 font-mono">
-                Supabase Live
+              <span className="block text-[10px] uppercase tracking-widest text-amber-400/80 font-cinzel font-semibold">
+                Mount Kailash &bull; 3D Cosmic Runner
               </span>
             </div>
             <span className="block text-base sm:text-lg font-bold font-mythic tracking-wide bg-gradient-to-r from-amber-200 via-marigold to-saffron-400 bg-clip-text text-transparent">

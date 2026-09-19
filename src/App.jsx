@@ -14,14 +14,14 @@ export default function App() {
     return window.location.pathname || '/';
   });
 
-  // Keep path in sync with browser history & handle Google OAuth redirect
+  // Keep path in sync with browser history
   useEffect(() => {
     const handlePopState = () => {
       setCurrentRoute(window.location.pathname || '/');
     };
     window.addEventListener('popstate', handlePopState);
 
-    // Supabase auth state listener (captures Google OAuth redirects & session changes)
+    // Supabase auth state listener (captures email auth session changes)
     if (isLiveSupabaseConfigured && supabase) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
@@ -31,7 +31,7 @@ export default function App() {
             username: userMeta.full_name || userMeta.name || session.user.email?.split('@')[0] || 'Celestial Seeker',
             email: session.user.email,
             avatar_url: userMeta.avatar_url || userMeta.picture || null,
-            provider: session.user.app_metadata?.provider || 'google'
+            provider: 'email'
           };
           localAuth.setUser(syncedUser, true);
           await syncUserProfile(syncedUser);
@@ -41,11 +41,6 @@ export default function App() {
             import('./utils/supabaseClient.js').then(({ notifyWelcomeSignIn }) => {
               notifyWelcomeSignIn(syncedUser);
             });
-          }
-
-          // Clean up OAuth tokens from URL if present
-          if (window.location.hash && window.location.hash.includes('access_token')) {
-            window.history.replaceState({}, document.title, window.location.pathname);
           }
         }
       });

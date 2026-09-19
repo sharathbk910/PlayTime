@@ -213,6 +213,209 @@ app.post('/api/notify/welcome-signin', async (req, res) => {
 });
 
 /**
+ * POST /api/auth/email-auth
+ * Standard Email & Password Authentication Endpoint
+ * Creates distinct users in Supabase Auth & public.profiles with auto-confirmation
+ */
+app.post('/api/auth/email-auth', async (req, res) => {
+  try {
+    const { email, password, username, isSignUp } = req.body;
+
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid email address.' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = (username && username.trim().slice(0, 32)) || cleanEmail.split('@')[0];
+
+    if (!supabase) {
+      // In-memory demo fallback
+      const demoId = `devotee-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '')}`;
+      const userObj = {
+        id: demoId,
+        username: cleanUsername,
+        email: cleanEmail,
+        provider: 'email'
+      };
+      profileStore.set(demoId, userObj);
+      return res.json({
+        success: true,
+        user: userObj,
+        session: { access_token: `demo_${Date.now()}` },
+        message: isSignUp ? 'Contestant registered successfully!' : 'Signed in successfully!'
+      });
+    }
+
+    if (isSignUp) {
+      // 1. Check if user with this email already exists
+      const { data: userList } = await supabase.auth.admin.listUsers();
+      const existingUser = userList?.users?.find(u => u.email?.toLowerCase() === cleanEmail);
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'An account with this email already exists. Please Sign In.'
+        });
+      }
+
+      // 2. Check username collision to prevent constraint conflicts
+      let finalUsername = cleanUsername;
+      const { data: nameCheck } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', finalUsername)
+        .maybeSingle();
+
+      if (nameCheck) {
+        finalUsername = `${cleanUsername}_${Math.floor(100 + Math.random() * 900)}`;
+      }
+
+      // 3. Create user via admin API with email_confirm: true to avoid email lockout
+      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+        email: cleanEmail,
+        password: password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: finalUsername
+        }
+      });
+
+      if (createErr) throw createErr;
+
+      // 4. Ensure distinct row in public.profiles for this unique user ID
+      if (newUser?.user) {
+        await supabase.from('profiles').upsert({
+          id: newUser.user.id,
+          username: finalUsername,
+          email: cleanEmail,
+          wisdom_rank: 'Celestial Seeker',
+          avatar_aspect: 'Golden Mooshak',
+          highest_score: 0,
+          best_distance_meters: 0,
+          total_modaks_collected: 0,
+          total_races_completed: 0,
+          wisdom_level: 1,
+          cleared_lore_levels: [1],
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+      }
+
+      // 5. Authenticate newly created user to generate live session tokens
+      const anonClient = createClient(
+        process.env.SUPABASE_URL,
+        process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
+      const { data: loginData } = await anonClient.auth.signInWithPassword({
+        email: cleanEmail,
+        password
+      });
+
+      const userProfile = {
+        id: newUser.user.id,
+        username: finalUsername,
+        email: cleanEmail,
+        provider: 'email'
+      };
+
+      return res.json({
+        success: true,
+        session: loginData?.session || null,
+        user: userProfile,
+        message: 'Contestant account created and verified! Entering sanctum...'
+      });
+
+    } else {
+      // Sign In Flow
+      const anonClient = createClient(
+        process.env.SUPABASE_URL,
+        process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
+
+      let { data: loginData, error: loginErr } = await anonClient.auth.signInWithPassword({
+        email: cleanEmail,
+        password
+      });
+
+      // If failed due to unconfirmed email, auto-confirm via admin and retry
+      if (loginErr && loginErr.message?.toLowerCase().includes('confirm')) {
+        const { data: userList } = await supabase.auth.admin.listUsers();
+        const userRec = userList?.users?.find(u => u.email?.toLowerCase() === cleanEmail);
+        if (userRec) {
+          await supabase.auth.admin.updateUserById(userRec.id, { email_confirm: true });
+          const retry = await anonClient.auth.signInWithPassword({ email: cleanEmail, password });
+          loginData = retry.data;
+          loginErr = retry.error;
+        }
+      }
+
+      if (loginErr) {
+        return res.status(401).json({
+          success: false,
+          message: loginErr.message || 'Invalid email or password.'
+        });
+      }
+
+      const authUser = loginData?.user;
+      if (!authUser) {
+        return res.status(401).json({ success: false, message: 'Authentication failed.' });
+      }
+
+      // Fetch devotee's distinct profile from Supabase
+      const { data: dbProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      const userProfile = {
+        id: authUser.id,
+        username: dbProfile?.username || authUser.user_metadata?.full_name || cleanEmail.split('@')[0],
+        email: authUser.email,
+        avatar_url: dbProfile?.avatar_url || authUser.user_metadata?.avatar_url || null,
+        avatar_aspect: dbProfile?.avatar_aspect || 'Golden Mooshak',
+        wisdom_rank: dbProfile?.wisdom_rank || 'Celestial Seeker',
+        highest_score: dbProfile?.highest_score || 0,
+        best_distance: Number(dbProfile?.best_distance_meters) || 0,
+        wisdom_level: dbProfile?.wisdom_level || 1,
+        cleared_lore_levels: dbProfile?.cleared_lore_levels || [1],
+        provider: 'email'
+      };
+
+      // Ensure distinct profile exists in public.profiles if missing
+      if (!dbProfile) {
+        await supabase.from('profiles').upsert({
+          id: authUser.id,
+          username: userProfile.username,
+          email: cleanEmail,
+          wisdom_rank: 'Celestial Seeker',
+          avatar_aspect: 'Golden Mooshak',
+          highest_score: 0,
+          best_distance_meters: 0,
+          total_modaks_collected: 0,
+          total_races_completed: 0,
+          wisdom_level: 1,
+          cleared_lore_levels: [1],
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+      }
+
+      return res.json({
+        success: true,
+        session: loginData.session,
+        user: userProfile,
+        message: 'Welcome back, devotee!'
+      });
+    }
+  } catch (err) {
+    console.error('Email authentication error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Authentication error.' });
+  }
+});
+
+/**
  * POST /api/profile/update-username
  * Allows devotee to customize and persist their display name
  */
@@ -385,19 +588,38 @@ app.post('/api/scores/submit', async (req, res) => {
 
     const GUEST_FALLBACK_UUID = '75305c97-42f8-4686-a591-33e055b62e3b';
     const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
-    const targetUserId = isUuid(user_id) ? user_id : GUEST_FALLBACK_UUID;
+    const isRealUser = isUuid(user_id) && user_id !== GUEST_FALLBACK_UUID;
+    const targetUserId = isRealUser ? user_id : GUEST_FALLBACK_UUID;
 
     // Supabase authoritative persistence
     let supabasePersisted = false;
     if (supabase) {
       try {
-        // 1. Ensure profile exists so foreign key constraints succeed
-        await supabase.from('profiles').upsert({
-          id: targetUserId,
-          username: username || 'Celestial Seeker',
-          email: req.user?.email || `${(username || 'seeker').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@kailash.io`,
-          wisdom_rank: wisdom_rank
-        }, { onConflict: 'id' });
+        // 1. Only update aggregated stats for authenticated users (never overwrite guest profile)
+        if (isRealUser) {
+          const { data: currentDbProfile } = await supabase
+            .from('profiles')
+            .select('highest_score, best_distance_meters, total_modaks_collected, total_races_completed')
+            .eq('id', targetUserId)
+            .maybeSingle();
+
+          const prevHighest = currentDbProfile?.highest_score || 0;
+          const prevDistance = Number(currentDbProfile?.best_distance_meters) || 0;
+          const prevModaks = currentDbProfile?.total_modaks_collected || 0;
+          const prevRaces = currentDbProfile?.total_races_completed || 0;
+
+          await supabase
+            .from('profiles')
+            .update({
+              highest_score: Math.max(prevHighest, authoritativeScore),
+              best_distance_meters: Math.max(prevDistance, finalDistance),
+              total_modaks_collected: prevModaks + modaks_collected,
+              total_races_completed: prevRaces + 1,
+              wisdom_rank: wisdom_rank,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', targetUserId);
+        }
 
         // 2. Insert validated game session
         const { data: dbSession, error: dbErr } = await supabase.from('game_sessions').insert({
