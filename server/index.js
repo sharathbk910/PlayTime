@@ -379,18 +379,23 @@ app.get('/api/profile/:id', (req, res) => {
   });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`🛕 Celestial Dash Server running on port ${PORT}`);
-  console.log(`🛡️  Anti-Cheat Engine: Enforcing Speed Bounds & Item Density Checks`);
-  console.log(`🌌 Gemini AI Status: ${process.env.GEMINI_API_KEY ? 'Configured' : 'Fallback Vault Active'}`);
-});
+if (!process.env.VERCEL) {
+  const server = app.listen(PORT, () => {
+    console.log(`🛕 Celestial Dash Server running on port ${PORT}`);
+    console.log(`🛡️  Anti-Cheat Engine: Enforcing Speed Bounds & Item Density Checks`);
+    console.log(`🌌 Gemini AI Status: ${process.env.GEMINI_API_KEY ? 'Configured' : 'Fallback Vault Active'}`);
+  });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${PORT} is already in use! Kill the existing server process and retry.`);
-    console.error(`   Run: netstat -ano | findstr :${PORT}  then  taskkill /PID <PID> /F`);
-  } else {
-    console.error('❌ Server error:', err.message);
-  }
-  process.exit(1);
-});
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use! Kill the existing server process and retry.`);
+      console.error(`   Run: netstat -ano | findstr :${PORT}  then  taskkill /PID <PID> /F`);
+    } else {
+      console.error('❌ Server error:', err.message);
+    }
+    process.exit(1);
+  });
+}
+
+export default app;
+
