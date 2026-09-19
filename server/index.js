@@ -122,7 +122,7 @@ app.use(verifySupabaseToken);
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    game: "Celestial Dash: Mooshak's Quest (Secure Multiplayer Runner Edition)",
+    game: "ModhakVerse: The Epic Journey of Ganpati",
     timestamp: new Date().toISOString(),
     services: {
       gemini_ai: process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('your_') ? 'active' : 'fallback_mode',

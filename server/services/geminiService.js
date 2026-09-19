@@ -107,7 +107,7 @@ export async function getDivineTrivia(difficulty = 'medium', loreLevel = 1) {
   }
 
   try {
-    const prompt = `You are the Divine Oracle of Mount Kailash presiding over "Celestial Dash: Mooshak's Quest".
+    const prompt = `You are the Divine Oracle presiding over "ModhakVerse: The Epic Journey of Ganpati".
 Generate a SHORT, engaging multiple-choice trivia question strictly about this chronological chapter of Lord Ganesha's life:
 CHRONOLOGICAL TOPIC: "${chapterTopic}".
 Level: ${normalizedLevel} of 10.

@@ -287,7 +287,7 @@ export default function GameArena({ onNavigate }) {
         setIsRunning(true);
         isRunningRef.current = true;
         lastFrameTime.current = performance.now();
-        logUserAction('GAME_START', 'Devotee launched Celestial Dash on 3 cosmic lanes');
+        logUserAction('GAME_START', 'Devotee launched ModhakVerse runner');
       }
     }, 850);
   }, [currentUser.id, generateTrackSegment]);
@@ -725,7 +725,7 @@ export default function GameArena({ onNavigate }) {
   // Copy shareable run card to clipboard
   const handleCopyShareCard = () => {
     const finalDist = distanceTraveled.toFixed(1);
-    const shareText = `🛕 Celestial Dash: Mooshak's Quest\n🏆 Score: ${score} points\n⚡ Distance Dashed: ${finalDist}m\n🥮 Modaks Gathered: ${modaksCollected}\nCan you outrun Mooshak across Mount Kailash? Play now: ${window.location.origin}`;
+    const shareText = `🪷 ModhakVerse: The Epic Journey of Ganpati\n🏆 Score: ${score} points\n⚡ Distance Dashed: ${finalDist}m\n🥮 Modaks Gathered: ${modaksCollected}\nPlay now: ${window.location.origin}`;
     navigator.clipboard.writeText(shareText);
     setCopiedShare(true);
     audioEngine.playTempleBell(740);
@@ -844,7 +844,7 @@ export default function GameArena({ onNavigate }) {
               {countdown}
             </span>
             <span className="block text-sm sm:text-base font-cinzel text-amber-300/80 uppercase tracking-widest mt-4">
-              Mount Kailash Gates Opening...
+              ModhakVerse Gates Opening...
             </span>
           </div>
         </div>
@@ -1015,10 +1015,10 @@ export default function GameArena({ onNavigate }) {
             </div>
 
             <h3 className="text-2xl sm:text-3xl font-bold font-mythic text-amber-100 glow-text-gold">
-              Celestial Dash Concluded!
+              ModhakVerse Run Concluded!
             </h3>
             <p className="text-xs text-amber-300/80 font-cinzel mt-1 mb-5">
-              "Mooshak's devotion shines across the celestial sphere"
+              "Devotion and wisdom shine across the sacred realm"
             </p>
 
             {/* Run Metrics Breakdown */}
@@ -1068,7 +1068,7 @@ export default function GameArena({ onNavigate }) {
                   <span>Complimentary Free Trial Dash Concluded</span>
                 </div>
                 <p className="text-xs text-amber-300/80 font-cinzel leading-relaxed">
-                  You've experienced Mount Kailash! Sign in with your Email ID to unlock unlimited dashes, save your score to the official Supabase Leaderboard, and explore the 10 Sacred Ganesha Lore Chapters.
+                  You've experienced ModhakVerse! Sign in with your Email ID to unlock unlimited dashes, save your score to the official Supabase Leaderboard, and explore the 10 Sacred Ganesha Lore Chapters.
                 </p>
                 <button
                   onClick={() => onNavigate('/auth')}
@@ -1167,7 +1167,7 @@ export default function GameArena({ onNavigate }) {
             </div>
 
             <h3 className="text-2xl font-bold font-mythic text-amber-100 glow-text-gold">
-              Celestial Trial Concluded
+              ModhakVerse Trial Concluded
             </h3>
             <p className="text-xs text-amber-300/90 font-cinzel mt-1 mb-5">
               1 Free Trial Match Completed
@@ -1179,7 +1179,7 @@ export default function GameArena({ onNavigate }) {
                 <span>Sign in to unlock full celestial privileges:</span>
               </div>
               <ul className="space-y-1.5 pl-6 list-disc text-amber-100/80 text-[11px]">
-                <li>Unlimited dashes across Mount Kailash lanes</li>
+                <li>Unlimited dashes across sacred realms</li>
                 <li>Permanently sync scores to Supabase Leaderboard</li>
                 <li>Answer 10 Chronological Ganesha Lore Chapters</li>
                 <li>Customize your Devotee Display Name and Avatar</li>

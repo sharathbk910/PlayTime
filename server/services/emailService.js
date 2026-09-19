@@ -11,7 +11,7 @@ export async function sendWelcomeEmailNotification({ email, username, provider =
     timeZone: 'UTC'
   });
 
-  const emailSubject = `🛕 Welcome to Celestial Dash, ${username}! (Ganesh Chaturthi Contest)`;
+  const emailSubject = `🪷 Welcome to ModhakVerse, ${username}! The Epic Journey of Ganpati`;
 
   const emailHtml = `
     <!DOCTYPE html>
@@ -29,17 +29,17 @@ export async function sendWelcomeEmailNotification({ email, username, provider =
       </head>
       <body>
         <div class="card">
-          <div style="font-size: 40px; margin-bottom: 12px;">🪷 🐭 🥮</div>
-          <div class="title">Welcome, Devotee ${username}!</div>
+          <div style="font-size: 40px; margin-bottom: 12px;">🪷 🕉️ 🥮</div>
+          <div class="title">Welcome to ModhakVerse, Devotee ${username}!</div>
           <div class="badge">Authenticated via ${provider.toUpperCase()}</div>
           <p class="text">
-            Your sacred credentials have been verified and recorded in the <strong>Supabase Kailash Cloud Vault</strong> on <strong>${formattedDate} (UTC)</strong>.
+            Your sacred credentials have been verified and recorded in the <strong>Supabase Cloud Vault</strong> on <strong>${formattedDate} (UTC)</strong>.
           </p>
           <p class="text">
-            Take the reins of Lord Ganesha's vahana, Mooshak! Sprint across the 3 cosmic highway lanes, answer the Gemini AI Divine Gate riddles to level up your wisdom, and climb the Global Contest Leaderboard.
+            Enter the sacred realm of ModhakVerse! Run through celestial realms, collect sweet golden Modaks, solve divine trivia questions, and uncover the epic 10-chapter story of Lord Ganpati's legendary journey.
           </p>
           <div class="footer">
-            Ganesh Chaturthi Game Design Contest &bull; Built with Devotion
+            ModhakVerse &bull; Built with Devotion
           </div>
         </div>
       </body>

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Play, Trophy, Sparkles, Flame, Compass } from 'lucide-react';
+import { Play, Trophy, Sparkles } from 'lucide-react';
 import { audioEngine } from '../utils/audioEngine';
+import modhakverseLogo from '../assets/modhakverse_logo.jpg';
 
 export default function LandingPage({ onNavigate }) {
   const handleStartDash = () => {
@@ -30,25 +31,28 @@ export default function LandingPage({ onNavigate }) {
       </div>
 
       {/* Main Gaming Hero Container */}
-      <div className="relative z-10 w-full max-w-3xl flex flex-col items-center text-center my-auto py-8">
+      <div className="relative z-10 w-full max-w-3xl flex flex-col items-center text-center my-auto py-6">
 
-        {/* Majestic Glowing Mooshak Hero Emblem */}
-        <div className="relative my-4 w-52 h-52 sm:w-64 sm:h-64 flex items-center justify-center">
-          {/* Rotating Celestial Mandala Rings */}
+        {/* Majestic Glowing Ganpati Logo Hero Emblem */}
+        <div className="relative my-3 w-48 h-48 sm:w-60 sm:h-60 flex items-center justify-center">
+          {/* Rotating Sacred Mandala Rings */}
           <div className="absolute inset-0 rounded-full border-2 border-dashed border-gold-divine/40 animate-mandala-reverse opacity-70" />
-          <div className="absolute inset-3 rounded-full border border-saffron-500/50 animate-mandala-spin opacity-60" />
-          <div className="absolute inset-6 rounded-full bg-gradient-to-tr from-saffron-950/80 via-cosmic-950/90 to-amber-950/70 border border-gold-400/40 shadow-2xl backdrop-blur-sm" />
+          <div className="absolute inset-2 rounded-full border border-saffron-500/50 animate-mandala-spin opacity-60" />
 
-          {/* Interactive Mooshak Vahana */}
+          {/* Interactive Ganpati Theme Logo Emblem */}
           <div
             onClick={handleStartDash}
-            className="relative z-10 text-8xl sm:text-9xl drop-shadow-[0_0_45px_rgba(255,153,51,0.95)] transform hover:scale-115 hover:rotate-6 active:scale-95 transition-all duration-500 cursor-pointer animate-float"
-            title="Click to launch Celestial Dash!"
+            className="relative z-10 w-40 h-40 sm:w-52 sm:h-52 rounded-full p-1 bg-gradient-to-tr from-saffron-500 via-gold-400 to-amber-300 shadow-[0_0_50px_rgba(255,180,0,0.75)] hover:shadow-[0_0_80px_rgba(255,215,0,0.95)] transform hover:scale-105 active:scale-95 transition-all duration-500 cursor-pointer overflow-hidden border-2 border-gold-300 group"
+            title="Click to enter ModhakVerse!"
           >
-            🐭
+            <img 
+              src={modhakverseLogo} 
+              alt="ModhakVerse Logo" 
+              className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-500" 
+            />
           </div>
 
-          {/* Floating Sacred Modaks */}
+          {/* Floating Sacred Modaks & Sparks */}
           <span className="absolute -top-1 -right-2 text-3xl sm:text-4xl animate-float filter drop-shadow(0 0 15px #ffd700)">
             🥮
           </span>
@@ -60,15 +64,22 @@ export default function LandingPage({ onNavigate }) {
           </span>
         </div>
 
-        {/* Bold Gaming Title */}
+        {/* Game Title: ModhakVerse */}
         <h1 className="text-4xl sm:text-6xl md:text-7xl font-black font-mythic tracking-wider uppercase bg-gradient-to-b from-amber-100 via-marigold to-saffron-500 bg-clip-text text-transparent glow-text-gold drop-shadow-[0_0_50px_rgba(255,180,0,0.5)]">
-          Celestial Dash
+          ModhakVerse
         </h1>
 
-        {/* Clean Gaming Subtitle */}
-        <p className="text-sm sm:text-base md:text-lg font-cinzel uppercase tracking-[0.35em] text-amber-300/90 font-bold mt-2 mb-8">
-          Mooshak's Quest
+        {/* Mythic Subtitle */}
+        <p className="text-xs sm:text-sm md:text-base font-cinzel uppercase tracking-[0.35em] text-amber-300/90 font-bold mt-2 mb-4">
+          The Epic Journey of Ganpati
         </p>
+
+        {/* Core Gameplay Description */}
+        <div className="max-w-xl mx-auto mb-6 px-6 py-4 rounded-2xl temple-glass border border-gold-500/30 shadow-xl backdrop-blur-md">
+          <p className="text-sm sm:text-base text-amber-100/95 leading-relaxed font-sans">
+            Run through sacred celestial realms, collect sweet golden Modaks, and answer mythological trivia questions to discover and master the epic story of Ganpati's legendary journey!
+          </p>
+        </div>
 
         {/* Prominent Centerpiece Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-md">
@@ -91,14 +102,14 @@ export default function LandingPage({ onNavigate }) {
           </button>
         </div>
 
-        {/* Minimal Gaming Status Ticker */}
-        <div className="flex items-center justify-center gap-4 sm:gap-6 mt-10 text-xs font-cinzel text-amber-300/70">
+        {/* Clean Gaming Status Ticker */}
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mt-8 text-xs font-cinzel text-amber-300/80">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Mount Kailash 3-Lane Track</span>
+            <span>Run & Learn</span>
           </span>
           <span className="text-amber-500/40">&bull;</span>
-          <span>10 Lore Chapters</span>
+          <span>10 Epic Lore Chapters</span>
           <span className="text-amber-500/40">&bull;</span>
           <span>Realtime Ghost Racers</span>
         </div>

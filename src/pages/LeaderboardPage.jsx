@@ -48,7 +48,7 @@ export default function LeaderboardPage({ onNavigate }) {
       <div className="text-center">
         <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full temple-glass border border-gold-400/40 text-xs font-cinzel text-amber-300 uppercase tracking-widest mb-3 shadow-lg">
           <Trophy className="w-3.5 h-3.5 text-yellow-400" />
-          <span>Ganesh Chaturthi Contest Standings</span>
+          <span>ModhakVerse Global Standings</span>
           <span className="text-amber-400/50">&bull;</span>
           <span className="text-emerald-300 font-mono text-[10px] flex items-center gap-1">
             <Cloud className="w-3 h-3" />
@@ -57,7 +57,7 @@ export default function LeaderboardPage({ onNavigate }) {
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-bold font-mythic text-amber-100 glow-text-gold">
-          The Celestial Dash Leaderboard
+          The ModhakVerse Leaderboard
         </h1>
         <p className="text-xs sm:text-sm text-amber-300/80 font-cinzel max-w-lg mx-auto mt-2">
           Rankings cryptographically verified by the Celestial Anti-Cheat Engine &bull; Speed, item density & distance enforced
@@ -204,7 +204,7 @@ export default function LeaderboardPage({ onNavigate }) {
           <div className="py-16 flex flex-col items-center justify-center space-y-3">
             <div className="w-10 h-10 rounded-full border-2 border-gold-400 border-t-transparent animate-spin" />
             <p className="text-xs font-cinzel text-amber-300 animate-pulse">
-              Unrolling the Golden Scroll of Mount Kailash from Supabase Vault...
+              Unrolling the Golden Scroll from Supabase Vault...
             </p>
           </div>
         ) : filteredEntries.length === 0 ? (

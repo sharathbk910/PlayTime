@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Volume2, VolumeX, Trophy, Compass, User, LogOut, ShieldCheck, Sparkles, Play, Cloud } from 'lucide-react';
 import { audioEngine } from '../utils/audioEngine';
 import { localAuth, supabase, isLiveSupabaseConfigured } from '../utils/supabaseClient';
+import modhakverseLogo from '../assets/modhakverse_logo.jpg';
 
 export default function Navbar({ currentRoute, onNavigate }) {
   const [isMuted, setIsMuted] = useState(false);
@@ -29,23 +30,28 @@ export default function Navbar({ currentRoute, onNavigate }) {
 
   useEffect(() => {
     refreshUser();
-  }, [currentRoute]);
+    window.addEventListener('modhakverse_auth_change', refreshUser);
+    window.addEventListener('storage', refreshUser);
+    return () => {
+      window.removeEventListener('modhakverse_auth_change', refreshUser);
+      window.removeEventListener('storage', refreshUser);
+    };
+  }, []);
 
   const handleToggleSound = () => {
     const muted = audioEngine.toggleMute();
     setIsMuted(muted);
-    if (!muted) {
-      audioEngine.playTempleBell(660);
-    }
   };
 
   const handleLogout = async () => {
-    if (isLiveSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
+    localAuth.signOut();
+    if (supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {}
     }
-    localAuth.clearUser();
     setCurrentUser(null);
-    audioEngine.playTempleBell(528);
+    window.dispatchEvent(new Event('modhakverse_auth_change'));
     onNavigate('/');
   };
 
@@ -59,23 +65,25 @@ export default function Navbar({ currentRoute, onNavigate }) {
           className="flex items-center space-x-3 group text-left focus:outline-none cursor-pointer"
         >
           <div className="relative w-11 h-11 rounded-full bg-gradient-to-tr from-saffron-600 via-marigold to-gold-400 p-[2px] shadow-lg shadow-saffron-600/30 group-hover:scale-105 transition-transform duration-300">
-            <div className="w-full h-full rounded-full bg-cosmic-900 flex items-center justify-center text-xl">
-              🐭
+            <div className="w-full h-full rounded-full bg-cosmic-900 overflow-hidden flex items-center justify-center">
+              <img 
+                src={modhakverseLogo} 
+                alt="ModhakVerse Logo" 
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
+              />
             </div>
-            {/* Glowing Diya Pulse */}
+            {/* Glowing Pulse Accent */}
             <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-4 w-4 bg-saffron-500 items-center justify-center text-[8px]">✨</span>
             </span>
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="block text-[10px] uppercase tracking-widest text-amber-400/80 font-cinzel font-semibold">
-                Mount Kailash &bull; 3D Cosmic Runner
-              </span>
-            </div>
-            <span className="block text-base sm:text-lg font-bold font-mythic tracking-wide bg-gradient-to-r from-amber-200 via-marigold to-saffron-400 bg-clip-text text-transparent">
-              Celestial Dash: Mooshak's Quest
+            <span className="block text-base sm:text-xl font-bold font-mythic tracking-wide bg-gradient-to-r from-amber-100 via-gold-300 to-saffron-400 bg-clip-text text-transparent">
+              ModhakVerse
+            </span>
+            <span className="block text-[10px] uppercase tracking-wider text-amber-400/80 font-cinzel font-semibold">
+              The Epic Journey of Ganpati
             </span>
           </div>
         </button>
