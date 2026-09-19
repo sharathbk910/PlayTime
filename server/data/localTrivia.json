@@ -1,0 +1,130 @@
+[
+  {
+    "id": "trivia-1",
+    "topic": "The Cosmic Race",
+    "difficulty": "medium",
+    "question": "Kartikeya rode his swift peacock across planets and galaxies. Lord Ganesha circled His parents. Why was Ganesha declared the true victor?",
+    "options": [
+      "Because parents encompass the divine origin and entirety of the cosmos",
+      "Because Mooshak possessed secret celestial wings",
+      "Because Kartikeya paused to meditate on the moon",
+      "Because Narada Muni cast a mystical illusion"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "In Vedic cosmology, reverence for one's parents honors the primordial source of creation. Circling them encompasses all realms in supreme wisdom.",
+    "divine_blessing": "+200 Divine Multiplier & Extra Life Granted",
+    "source": "Ganesha Purana"
+  },
+  {
+    "id": "trivia-2",
+    "topic": "Mooshak the Sacred Vahana",
+    "difficulty": "medium",
+    "question": "Why does Lord Ganesha, the grand remover of obstacles, ride upon Mooshak, a tiny mouse?",
+    "options": [
+      "Mooshak symbolizes unruly worldly desires, mastered and guided by divine wisdom",
+      "Because mice can sneak into heavens without being seen",
+      "Mooshak was a celestial Gandharva punished for pride",
+      "Because small steeds run faster on narrow mountain paths"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "The mouse gnaws relentlessly in darkness, symbolizing unbridled desires (kama and lobha). Ganesha sitting atop Mooshak signifies supreme intellect mastering the senses.",
+    "divine_blessing": "+150 Wisdom & Swift Reflexes",
+    "source": "Mudgala Purana"
+  },
+  {
+    "id": "trivia-3",
+    "topic": "The Sacred Modaka",
+    "difficulty": "easy",
+    "question": "Ganesha holds a sweet golden Modaka in His divine hand. What spiritual truth does its sweet inner core hidden within outer dough represent?",
+    "options": [
+      "The bliss of Self-Realization (Atma-Jnana) concealed within the physical body",
+      "The abundance of the autumn harvest festival",
+      "A sacred reward only for temple priests",
+      "The sweet waters of the sacred river Ganga"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "The sweet jaggery-coconut filling represents inner spiritual realization and supreme bliss (Ananda), wrapped inside the plain outer shell of mortal existence.",
+    "divine_blessing": "+180 Divine Points & Modak Magnet",
+    "source": "Vedic Symbolism"
+  },
+  {
+    "id": "trivia-4",
+    "topic": "Ekadanta and the Mahabharata",
+    "difficulty": "medium",
+    "question": "When Sage Vyasa dictated the epic Mahabharata without pause, Ganesha broke His own tusk. Why did He make this sacrifice?",
+    "options": [
+      "To use it as a sacred pen so the flow of holy knowledge would never stop",
+      "To battle a demon disrupting the sacred recitation",
+      "To engrave the verses directly onto Mount Meru",
+      "To offer it as Dakshina to Brahma"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "Ekadanta prioritized the continuity of timeless wisdom over physical form, sacrificing His tusk to transcribe the greatest epic for humanity.",
+    "divine_blessing": "+250 Wisdom & Divine Shield",
+    "source": "Mahabharata Adi Parva"
+  },
+  {
+    "id": "trivia-5",
+    "topic": "The Broken Moon",
+    "difficulty": "hard",
+    "question": "Why did Lord Ganesha curse the Moon (Chandra) after the Moon laughed at Him on a full moon night?",
+    "options": [
+      "To teach that arrogance and superficial vanity must never mock divine humility",
+      "Because the Moon refused to light Mooshak's path",
+      "To prevent eclipses from darkening the earth",
+      "Because the Moon stole celestial nectar from Kailash"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "The Moon mocked Ganesha's form out of vanity for its own beauty. The curse humbled pride, establishing that inner virtue surpasses outward vanity.",
+    "divine_blessing": "+200 Celestial Radiance",
+    "source": "Brahma Vaivarta Purana"
+  },
+  {
+    "id": "trivia-6",
+    "topic": "The Pasha and Ankusha",
+    "difficulty": "medium",
+    "question": "Lord Ganesha holds a Pasha (noose) and an Ankusha (elephant goad). What do these sacred implements symbolize?",
+    "options": [
+      "The noose binds desires; the goad spurs humanity forward on the path of Dharma",
+      "Weapons to subdue mythical forest beasts",
+      "Tools for temple construction on Kailash",
+      "Symbols of royal kingship and physical dominion"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "The Pasha catches and tames illusory desires, while the Ankusha prods the soul to overcome sloth and pursue righteousness.",
+    "divine_blessing": "+150 Focus & Speed Boost",
+    "source": "Agama Shastras"
+  },
+  {
+    "id": "trivia-7",
+    "topic": "Vighnaharta",
+    "difficulty": "easy",
+    "question": "Why is Lord Ganesha invoked as 'Vighnaharta' at the beginning of every sacred endeavor?",
+    "options": [
+      "As Lord of Beginnings, He dissolves obstacles for sincere seekers and places barriers for the arrogant",
+      "He was the first deity born in the celestial realm",
+      "He won the favor of Indra during the churning of the ocean",
+      "He guards the physical gates of Mount Meru"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "Ganesha is both Vighnaharta (obstacle remover) and Vighnakarta (obstacle creator), testing intention to ensure devotion and humility prevail.",
+    "divine_blessing": "+300 Obstacle Immunity",
+    "source": "Atharvashirsha Upanishad"
+  },
+  {
+    "id": "trivia-8",
+    "topic": "The Large Ears",
+    "difficulty": "easy",
+    "question": "What is the profound spiritual significance of Lord Ganesha's large elephant ears (Surpakarna)?",
+    "options": [
+      "To listen more and absorb divine wisdom while winnowing out trivial chatter",
+      "To hear prayers whispered from distant planetary systems",
+      "To fan away the heat of cosmic fire rifts",
+      "To command the celestial winds"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "Surpa means a winnowing basket. Ganesha's ears retain essential spiritual truth while allowing transient gossip and negativity to drift away.",
+    "divine_blessing": "+160 Keen Perception",
+    "source": "Ganesha Atharvashirsha"
+  }
+]

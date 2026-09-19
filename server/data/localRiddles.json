@@ -1,0 +1,130 @@
+[
+  {
+    "id": "riddle-1",
+    "topic": "The True Universe",
+    "difficulty": "medium",
+    "question": "Kartikeya rode his peacock to traverse oceans, continents, and stars. Lord Ganesha walked around Shiva and Parvati. Why was Ganesha declared the winner of the cosmic race?",
+    "options": [
+      "Because parents are the source and embodiment of the entire cosmos",
+      "Because his vehicle Mooshika had secret celestial wings",
+      "Because Kartikeya stopped to rest along the Milky Way",
+      "Because Narada Muni cast a mystical illusion on the finish line"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "In Hindu cosmology, one's parents and divine source represent the primordial origin of all existence. Circling them with devotion encompasses all three worlds with wisdom.",
+    "divine_blessing": "+150 Wisdom & Pradakshina Multiplier Unlocked",
+    "source": "Ancient Vedic Lore / Fallback Oracle"
+  },
+  {
+    "id": "riddle-2",
+    "topic": "The Broken Tusk (Ekadanta)",
+    "difficulty": "medium",
+    "question": "When Sage Vyasa dictated the grand epic Mahabharata without pausing, Ganesha broke his own tusk. What virtue did this sacrifice represent?",
+    "options": [
+      "Unflinching commitment to knowledge and sacred duty over physical vanity",
+      "Martial strength against divine adversaries",
+      "A secret weapon to etch golden inscriptions on Mount Meru",
+      "An offering to the moon after its mocking laughter"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "Ekadanta broke his tusk to continue transcribing the scripture without missing a syllable when his stylus fractured, demonstrating the supremacy of dharma and knowledge.",
+    "divine_blessing": "+120 Wisdom & Indomitable Focus",
+    "source": "Mahabharata Transcription Lore"
+  },
+  {
+    "id": "riddle-3",
+    "topic": "The Humble Steed (Mooshika)",
+    "difficulty": "hard",
+    "question": "Lord Ganesha rides Mooshika, a humble mouse that burrows unseen in the dark. What psychological aspect does this mount symbolize?",
+    "options": [
+      "The uncontrollable desires of the human mind, tamed by intellect and wisdom",
+      "The stealth needed for nocturnal warfare",
+      "The illusion of time in the material realm",
+      "The hidden wealth buried beneath temple foundations"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "The mouse gnaws relentlessly in darkness, symbolic of insidious base desires (kama and lobha). Ganesha riding it shows wisdom commanding and guiding desire.",
+    "divine_blessing": "+140 Wisdom & Mind Mastery",
+    "source": "Ganesha Purana"
+  },
+  {
+    "id": "riddle-4",
+    "topic": "The Modaka of Supreme Bliss",
+    "difficulty": "easy",
+    "question": "Ganesha holds a golden Modaka in His left lower hand. What does the sweet inner jaggery and coconut filling wrapped in dough signify?",
+    "options": [
+      "The sweet nectar of supreme Self-Realization (Atma-Jnana) hidden within the outer body",
+      "A reward solely for fasting during the waxing moon",
+      "The sweetest crop harvested in the autumn festival",
+      "A tribute from celestial Gandharvas to Mount Kailash"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "The sweet interior represents Mahasukh / Brahmananda (supreme spiritual bliss), discovered when one pierces through outer material illusions.",
+    "divine_blessing": "+100 Wisdom & Nectar of Clarity",
+    "source": "Mudgala Purana"
+  },
+  {
+    "id": "riddle-5",
+    "topic": "The Sacred Pranava (OM)",
+    "difficulty": "hard",
+    "question": "Ganesha's physical form is revered as the anthropomorphic embodiment of which primeval sound?",
+    "options": [
+      "Omkara (AUM) — The primordial cosmic vibration of creation, sustenance, and dissolution",
+      "The conch sound blown before the Kurukshetra battle",
+      "The roar of the lion in the celestial forest",
+      "The seven musical swaras of Saraswati's veena"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "The silhouette of Ganesha's head, tusk, and trunk mirrors the ancient Devanagari glyph of OM (ॐ). He is the Lord of Beginnings and sound vibration.",
+    "divine_blessing": "+160 Wisdom & Cosmic Resonance",
+    "source": "Ganapati Atharvashirsha"
+  },
+  {
+    "id": "riddle-6",
+    "topic": "The Ankusha and Pasha",
+    "difficulty": "medium",
+    "question": "Ganesha wields the Pasha (noose) and the Ankusha (elephant goad). What dual role do these divine emblems serve for the spiritual seeker?",
+    "options": [
+      "The noose binds worldly attachments; the goad propels the soul toward higher righteousness",
+      "Weapons to subdue physical beasts in the Himalayan peaks",
+      "Tools for harvesting sacred lotus stems in the celestial lake",
+      "Signs of royal governance over terrestrial kingdoms"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "The Pasha ropes in our wandering senses, while the Ankusha prods our lethargy to move forward on the path of truth and wisdom.",
+    "divine_blessing": "+130 Wisdom & Soul Guidance",
+    "source": "Vedic Symbolism"
+  },
+  {
+    "id": "riddle-7",
+    "topic": "The Fruit of Wisdom (Gyanapazham)",
+    "difficulty": "easy",
+    "question": "What was the divine reward placed before Ganesha and Kartikeya by Sage Narada that ignited the Celestial Race?",
+    "options": [
+      "The Fruit of Supreme Spiritual Knowledge (Gyanapazham)",
+      "The Golden Bow of Shiva (Pinaka)",
+      "The Amrita urn retrieved from the Cosmic Churning",
+      "The Crown of the King of the Devas"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "Narada brought the fruit of supreme knowledge which could not be sliced, only earned whole by the one who traversed the universe first.",
+    "divine_blessing": "+110 Wisdom & Pure Intuition",
+    "source": "Skanda Purana"
+  },
+  {
+    "id": "riddle-8",
+    "topic": "The Large Ears (Surpa-Karna)",
+    "difficulty": "easy",
+    "question": "What spiritual instruction do Lord Ganesha's wide, winnow-like elephant ears convey to every disciple?",
+    "options": [
+      "Listen intently and separate eternal truth from trivial chatter, just as a winnow sifts grain",
+      "Eavesdrop on hidden celestial conversations",
+      "Display royal hearing across all four cardinal directions",
+      "Shelter divine devotees from cosmic storms"
+    ],
+    "correct_index": 0,
+    "wisdom_explanation": "Surpa-Karna reminds seekers to develop profound listening (Shravana), retaining grains of truth while blowing away the chaff of gossip and negativity.",
+    "divine_blessing": "+105 Wisdom & Discernment",
+    "source": "Ganesha Upanishad"
+  }
+]
